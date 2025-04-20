@@ -4,8 +4,6 @@ import { Link, useLocation } from "react-router-dom";
 import Logo from "/logo.png";
 import {
   Bars3Icon,
-  MoonIcon,
-  SunIcon,
   NoSymbolIcon,
   ClockIcon,
   XMarkIcon,
@@ -25,15 +23,11 @@ const menuItems = [
 
 interface SidebarProps {
   onToggle?: (collapsed: boolean) => void;
-  isDarkMode: boolean;
-  toggleColorScheme: () => void;
   onTimerRunning: (isRunning: boolean) => void;
 }
 
 function Sidebar({
   onToggle,
-  isDarkMode,
-  toggleColorScheme,
   onTimerRunning
 }: SidebarProps) {
   const location = useLocation();
@@ -50,7 +44,6 @@ function Sidebar({
 
   const toggleFocusTimer = () => {
     setShowFocusTimer(!showFocusTimer);
-    // Hide block site popup if it's showing
     if (showBlockSitePopup) {
       setShowBlockSitePopup(false);
     }
@@ -58,8 +51,6 @@ function Sidebar({
 
   const handleBlockSite = (e: React.FormEvent) => {
     e.preventDefault();
-    // Here would go the functionality to actually block the site
-    // For now, we'll just clear the input and close the popup
     setBlockUrl("");
     setShowBlockSitePopup(false);
   };
@@ -68,14 +59,14 @@ function Sidebar({
     onToggle?.(collapsed);
   }, []);
 
-  /* utility: choose text color per state */
-  const iconColor = collapsed ? "text-gray-700" : "text-[#1B3B29]";
+  // default icon color
+  const iconColor = "text-white";
 
   return (
     <div className="h-full relative">
       <div
         className={`
-          bg-[#F7F5EF] h-full flex flex-col transition-all duration-500 ease-in-out
+          bg-[#181414] h-full flex flex-col transition-all duration-500 ease-in-out
           ${collapsed ? "w-16 p-2" : "w-48 p-4"}
         `}
         style={{
@@ -91,7 +82,7 @@ function Sidebar({
         >
           <button
             onClick={toggleSidebar}
-            className="p-1 rounded hover:bg-[#DAD5C4] transition"
+            className="p-1 rounded hover:bg-[#242424] transition"
             title={collapsed ? "Expand" : "Collapse"}
           >
             <Bars3Icon className={`h-6 w-6 ${iconColor}`} />
@@ -104,7 +95,7 @@ function Sidebar({
                 className="w-8 h-8 rounded-full shadow-sm"
                 alt="WorkNest Logo"
               />
-              <h2 className="text-lg font-bold text-[#1B3B29]">WorkNest</h2>
+              <h2 className="text-lg font-bold text-white">WorkNest</h2>
             </div>
           )}
         </div>
@@ -118,22 +109,8 @@ function Sidebar({
           `}
         >
           <button
-            onClick={toggleColorScheme}
-            className="p-2 rounded hover:bg-[#DAD5C4] transition"
-            title={isDarkMode ? "Light mode" : "Dark mode"}
-          >
-            {isDarkMode ? (
-              <SunIcon className={`h-6 w-6 ${iconColor}`} />
-            ) : (
-              <MoonIcon className={`h-6 w-6 ${iconColor}`} />
-            )}
-          </button>
-
-          <button
             onClick={() => !collapsed && setShowBlockSitePopup(true)}
-            className={`p-2 rounded hover:bg-[#DAD5C4] transition ${
-              showBlockSitePopup ? "bg-[#DAD5C4]" : ""
-            }`}
+            className="p-2 rounded hover:bg-[#242424] transition"
             title="Block sites"
           >
             <NoSymbolIcon className={`h-6 w-6 ${iconColor}`} />
@@ -141,9 +118,7 @@ function Sidebar({
 
           <button
             onClick={toggleFocusTimer}
-            className={`p-2 rounded hover:bg-[#DAD5C4] transition ${
-              showFocusTimer ? "bg-[#DAD5C4]" : ""
-            }`}
+            className="p-2 rounded hover:bg-[#242424] transition"
             title="Focus timer"
           >
             <ClockIcon className={`h-6 w-6 ${iconColor}`} />
@@ -152,7 +127,7 @@ function Sidebar({
 
         {/* Horizontal divider */}
         <div className={`${collapsed ? "mx-1 my-3" : "mx-2 my-3"}`}>
-          <div className="border-t border-gray-300"></div>
+          <div className="border-t border-gray-700"></div>
         </div>
 
         {/* nav menu */}
@@ -160,20 +135,21 @@ function Sidebar({
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
             const ItemIcon = item.icon;
-            
-            // Determine color based on active state
-            const iconColorForNav = isActive ? "text-white" : collapsed ? "text-gray-700" : "text-[#3D3D3D]";
-            
+
+            // always white by default
+            const iconColorForNav = isActive ? "text-white" : "text-white";
+
+            // if hovered (bg-[#242424]), force text back to dark
+            const hoverTextDark = "hover:text-white";
+
+            // collapsed vs expanded, active vs inactive
             const itemClasses = collapsed
-              ? // mini-sidebar: Use green background for active item
-                isActive 
-                ? "justify-center bg-[#1B3B29] text-white shadow" 
-                : "justify-center text-gray-700 hover:bg-[#DAD5C4]"
+              ? isActive
+                ? "justify-center bg-[#1B3B29] text-white shadow"
+                : `justify-center text-white hover:bg-[#242424] ${hoverTextDark}`
               : isActive
-              ? // expanded + active
-                "bg-[#1B3B29] text-white shadow"
-              : // expanded + inactive
-                "text-[#3D3D3D] hover:bg-[#DAD5C4] hover:text-[#1B3B29]";
+              ? "bg-[#1B3B29] text-white shadow"
+              : `text-white hover:bg-[#242424] ${hoverTextDark}`;
 
             return (
               <Link
@@ -198,39 +174,39 @@ function Sidebar({
 
       {/* Focus Timer Popup */}
       {!collapsed && showFocusTimer && (
-        <div className="absolute inset-0 bg-[#F7F5EF] p-4 z-40">
+        <div className="absolute inset-0 bg-[#181414] p-4 z-40">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-[#1B3B29] text-lg">Focus Timer</h3>
+            <h3 className="font-bold text-white text-lg">Focus Timer</h3>
             <button
               onClick={toggleFocusTimer}
-              className="text-gray-500 hover:text-gray-700 p-1"
+              className="text-gray-400 hover:text-white p-1"
             >
               <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
-          
+
           <div className="mt-2">
             <FocusTimer onTimerRunning={onTimerRunning} />
           </div>
         </div>
       )}
 
-      {/* Block Site Popup - Only shown when sidebar is expanded */}
+      {/* Block Site Popup */}
       {!collapsed && showBlockSitePopup && (
-        <div className="absolute inset-0 bg-[#F7F5EF] p-4 z-40">
+        <div className="absolute inset-0 bg-[#181414] p-4 z-40">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-[#1B3B29] text-lg">Block Website</h3>
-            <button 
+            <h3 className="font-bold text-white text-lg">Block Website</h3>
+            <button
               onClick={() => setShowBlockSitePopup(false)}
-              className="text-gray-500 hover:text-gray-700 p-1"
+              className="text-gray-400 hover:text-white p-1"
             >
               <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
-            
+
           <form onSubmit={handleBlockSite}>
             <div className="mb-4">
-              <label htmlFor="blockUrl" className="block text-sm text-gray-600 mb-2">
+              <label htmlFor="blockUrl" className="block text-white mb-2">
                 Enter URL to block:
               </label>
               <input
@@ -239,13 +215,13 @@ function Sidebar({
                 value={blockUrl}
                 onChange={(e) => setBlockUrl(e.target.value)}
                 placeholder="example.com"
-                className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B3B29] text-gray-900"
+                className="w-full px-3 py-2 text-sm border border-gray-700 rounded-lg bg-[#242424] focus:outline-none focus:ring-2 focus:ring-[#1B3B29] text-white"
               />
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-gray-400 mt-2">
                 URLs will be blocked in all browser tabs
               </p>
             </div>
-              
+
             <div className="flex justify-end">
               <button
                 type="submit"

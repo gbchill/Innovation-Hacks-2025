@@ -92,16 +92,16 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
   // Timer setup UI - only shown when not running or paused
   if (!isRunning && !isPaused) {
     return (
-      <div className="w-full bg-white rounded-lg shadow-sm p-4">
+      <div className="w-full bg-[#242424] rounded-lg shadow-sm p-4">
         <div className="mb-4">
-          <h2 className="text-center font-medium text-[#1B3B29] mb-3">Set Timer</h2>
+          <h2 className="text-center font-medium text-white mb-3">Set Timer</h2>
           
           <div className="flex gap-4 mb-4 justify-center">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Hours</label>
+              <label className="block text-sm text-gray-300 mb-1">Hours</label>
               <input
                 type="number"
-                className="w-16 border rounded p-2 text-center"
+                className="w-16 border border-gray-700 rounded p-2 text-center bg-[#181414] text-white"
                 value={hours}
                 min="0"
                 max="5"
@@ -109,10 +109,10 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Minutes</label>
+              <label className="block text-sm text-gray-300 mb-1">Minutes</label>
               <input
                 type="number"
-                className="w-16 border rounded p-2 text-center"
+                className="w-16 border border-gray-700 rounded p-2 text-center bg-[#181414] text-white"
                 value={minutes}
                 min="0"
                 max="59"
@@ -135,9 +135,9 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
 
   // Active timer UI
   return (
-    <div className="w-full bg-white rounded-lg shadow-sm p-4">
+    <div className="w-full bg-[#242424] rounded-lg shadow-sm p-4">
       <div className="text-center mb-4">
-        <div className="text-3xl font-mono text-[#1B3B29] font-bold mb-2">
+        <div className="text-3xl font-mono text-white font-bold mb-2">
           {formatTime(timeLeft)}
         </div>
 
@@ -148,7 +148,7 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
               className={`px-4 py-2 rounded-lg transition-colors ${
                 clickedButton === "pause" 
                   ? "bg-[#1B3B29] text-white" 
-                  : "bg-green-100 text-[#1B3B29] hover:bg-[#1B3B29] hover:text-white"
+                  : "bg-[#1B3B29] bg-opacity-50 text-white hover:bg-opacity-100"
               }`}
             >
               Pause
@@ -164,14 +164,14 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
           )}
           <button
             onClick={handleReset}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+            className="bg-red-800 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
           >
             Reset
           </button>
         </div>
 
         {pauseWait && (
-          <p className="text-sm text-red-600 mt-3">🧘 Hold on... pausing</p>
+          <p className="text-sm text-red-400 mt-3">🧘 Hold on... pausing</p>
         )}
       </div>
     </div>

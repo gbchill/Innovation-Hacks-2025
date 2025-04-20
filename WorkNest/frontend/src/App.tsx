@@ -17,10 +17,8 @@ const SIDEBAR_COLLAPSED = 64; // w-20 (5rem) ←‑ wider rail
 function App() {
   const [started, setStarted] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
 
-  const toggleColorScheme = () => setIsDarkMode((prev) => !prev);
   const handleSidebarToggle = (collapsed: boolean) =>
     setSidebarCollapsed(collapsed);
   
@@ -41,7 +39,7 @@ function App() {
       {/* Background animation tied to focus timer */}
       <AnimatedLoop show={timerActive} />
 
-      <div className="flex h-screen w-screen overflow-hidden bg-[#F7F5EF]">
+      <div className="flex h-screen w-screen overflow-hidden bg-[#181414]">
         {/* Sidebar */}
         <div
           className="z-20 h-full overflow-hidden transition-all duration-300"
@@ -49,8 +47,6 @@ function App() {
         >
           <Sidebar
             onToggle={handleSidebarToggle}
-            isDarkMode={isDarkMode}
-            toggleColorScheme={toggleColorScheme}
             onTimerRunning={handleTimerRunning}
           />
         </div>
@@ -64,7 +60,6 @@ function App() {
                 <BrowserPage
                   sidebarWidth={sidebarWidth}
                   sidebarCollapsed={sidebarCollapsed}
-                  isDarkMode={isDarkMode}
                 />
               }
             />

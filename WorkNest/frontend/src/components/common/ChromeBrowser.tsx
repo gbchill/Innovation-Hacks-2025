@@ -43,9 +43,9 @@ interface NavigationState {
 
 interface ChromeBrowserProps {
   initialUrl?: string;
-  sidebarWidth: number;              // ← always the exact pixel width
-  sidebarCollapsed: boolean;         // kept for parent‑child consistency
-  isDarkMode: boolean;
+  sidebarWidth: number;
+  sidebarCollapsed: boolean;
+  isDarkMode?: boolean;  // Made optional since we're removing light mode
 }
 
 interface Tab {
@@ -57,8 +57,7 @@ interface Tab {
 const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
   initialUrl = "https://www.google.com",
   sidebarWidth,
-  sidebarCollapsed, // eslint-disable-line @typescript-eslint/no-unused-vars
-  isDarkMode
+  sidebarCollapsed
 }) => {
   /* ---------- tab + nav state ---------- */
   const [tabs, setTabs] = useState<Tab[]>([
@@ -78,10 +77,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
   const [blockedSites, setBlockedSites] = useState<string[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
 
-  /* -------------- IMPORTANT LINE -------------- */
-  const actualSidebarWidth = sidebarWidth; // ← use whatever the parent sends
-  /* -------------------------------------------- */
-
+  const actualSidebarWidth = sidebarWidth;
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
   // Fetch blocked sites on mount
@@ -188,7 +184,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
     window.electronAPI?.createBrowserView(
       activeTab.url,
       actualSidebarWidth,
-      isDarkMode ? "dark" : "light"
+      "dark" // Always use dark mode
     );
 
     const navPoll = setInterval(() => {
@@ -200,7 +196,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
       window.electronAPI?.removeAllListeners();
       if (!noTabs) window.electronAPI?.removeBrowserView();
     };
-  }, [activeTabId, actualSidebarWidth, isElectron, noTabs, isDarkMode, isEditingInput, isBlocked]);
+  }, [activeTabId, actualSidebarWidth, isElectron, noTabs, isEditingInput, isBlocked]);
 
   /* ---------- update bounds whenever width changes ---------- */
   useEffect(() => {
@@ -208,12 +204,12 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
     window.electronAPI?.updateBrowserViewBounds(actualSidebarWidth);
   }, [actualSidebarWidth, isElectron, noTabs, isBlocked]);
 
-  /* ---------- apply color‑scheme change ---------- */
+  /* ---------- always use dark mode ---------- */
   useEffect(() => {
     if (isElectron && !fallbackMode && !noTabs && !isBlocked)
-      window.electronAPI?.setColorScheme(isDarkMode ? "dark" : "light");
+      window.electronAPI?.setColorScheme("dark");
     if (fallbackMode && !noTabs && !isBlocked) setTabs((prev) => [...prev]);
-  }, [isDarkMode, isElectron, fallbackMode, noTabs, isBlocked]);
+  }, [isElectron, fallbackMode, noTabs, isBlocked]);
 
   /* ---------- navigation handlers ---------- */
   const urlSubmit = (e: React.FormEvent) => {
@@ -298,13 +294,13 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
   // Render blocked screen
   if (isBlocked) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-[#F7F5EF]">
-        <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#181414]">
+        <div className="text-center max-w-md p-6 bg-[#242424] rounded-lg shadow-lg">
           <NoSymbolIcon className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+          <h2 className="text-2xl font-bold text-white mb-4">
             This Site is Blocked
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-300 mb-6">
             This website has been blocked in your focus settings.
           </p>
           <button
@@ -320,26 +316,26 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
 
   /* ---------- render ---------- */
   return (
-    <div className="w-full h-full flex flex-col bg-[#F7F5EF]">
+    <div className="w-full h-full flex flex-col bg-[#181414]">
       {/* Tabs bar */}
-      <div className="flex items-center bg-[#F7F5EF] border-b">
+      <div className="flex items-center bg-[#181414] border-b border-gray-700">
         <div className="flex-1 flex overflow-x-auto">
           {tabs.map((tab) => (
             <div
               key={tab.id}
               onClick={() => switchTab(tab.id)}
-              className={`flex items-center min-w-[140px] max-w-[240px] px-3 py-2 border-r cursor-pointer ${
+              className={`flex items-center min-w-[140px] max-w-[240px] px-3 py-2 border-r border-gray-700 cursor-pointer ${
                 tab.id === activeTabId
-                  ? "bg-[#F7F5EF] text-gray-900 font-medium"
-                  : "bg-[#F7F5EF] text-gray-700 hover:bg-gray-100"
+                  ? "bg-[#242424] text-white font-medium"
+                  : "bg-[#181414] text-gray-300 hover:bg-[#242424]"
               }`}
             >
-              <div className="truncate flex-1 text-black">
+              <div className="truncate flex-1 text-white">
                 {tab.title || getTabTitle(tab.url)}
               </div>
               <button
                 onClick={(e) => closeTab(tab.id, e)}
-                className="ml-2 p-1 rounded-full hover:bg-gray-200 text-gray-500"
+                className="ml-2 p-1 rounded-full hover:bg-gray-700 text-gray-400"
               >
                 <XMarkIcon className="h-4 w-4" />
               </button>
@@ -347,7 +343,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
           ))}
           <button
             onClick={addNewTab}
-            className="p-2 mx-1 text-gray-700 hover:bg-gray-100 rounded flex-shrink-0"
+            className="p-2 mx-1 text-gray-300 hover:bg-[#242424] rounded flex-shrink-0"
           >
             <PlusIcon className="h-5 w-5" />
           </button>
@@ -355,14 +351,14 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
       </div>
 
       {/* URL + nav */}
-      <div className="flex items-center p-2 bg-[#F7F5EF] border-b">
+      <div className="flex items-center p-2 bg-[#181414] border-b border-gray-700">
         <button
           onClick={goBack}
           disabled={!canGoBack || fallbackMode || noTabs}
           className={`p-2 rounded ${
             canGoBack && !fallbackMode && !noTabs
-              ? "text-gray-700 hover:bg-gray-200"
-              : "text-gray-400"
+              ? "text-white hover:bg-[#242424]"
+              : "text-gray-600"
           }`}
         >
           ←
@@ -372,8 +368,8 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
           disabled={!canGoForward || fallbackMode || noTabs}
           className={`p-2 rounded ${
             canGoForward && !fallbackMode && !noTabs
-              ? "text-gray-700 hover:bg-gray-200"
-              : "text-gray-400"
+              ? "text-white hover:bg-[#242424]"
+              : "text-gray-600"
           }`}
         >
           →
@@ -383,8 +379,8 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
           disabled={fallbackMode || noTabs}
           className={`p-2 rounded ${
             !fallbackMode && !noTabs
-              ? "text-gray-700 hover:bg-gray-200"
-              : "text-gray-400"
+              ? "text-white hover:bg-[#242424]"
+              : "text-gray-600"
           }`}
         >
           ↻
@@ -401,25 +397,25 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
               if (e.key === "Backspace" || e.key === "Delete")
                 e.stopPropagation();
             }}
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29] text-black"
+            className="w-full px-3 py-2 border border-gray-700 rounded bg-[#242424] focus:outline-none focus:ring-2 focus:ring-[#1B3B29] text-white"
             placeholder="Enter URL…"
             disabled={noTabs}
           />
         </form>
         {isLoading && !fallbackMode && !noTabs && (
-          <div className="ml-2 text-gray-600">Loading…</div>
+          <div className="ml-2 text-gray-300">Loading…</div>
         )}
       </div>
 
       {/* Content */}
       {noTabs ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-[#F7F5EF]">
-          <div className="text-center max-w-md p-6 bg-gray-50 rounded-lg shadow-sm">
-            <HomeIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-medium text-gray-800 mb-2">
+        <div className="flex-1 flex flex-col items-center justify-center bg-[#181414]">
+          <div className="text-center max-w-md p-6 bg-[#242424] rounded-lg shadow-sm">
+            <HomeIcon className="h-16 w-16 text-gray-500 mx-auto mb-4" />
+            <h2 className="text-xl font-medium text-white mb-2">
               No Open Tabs
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-300 mb-6">
               Open a new tab to start browsing.
             </p>
             <button
@@ -431,7 +427,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
           </div>
         </div>
       ) : fallbackMode ? (
-        <div className="flex-1 bg-[#F7F5EF]">
+        <div className="flex-1 bg-[#181414]">
           {tabs.map((tab) => (
             <iframe
               key={tab.id}
@@ -447,13 +443,13 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
         </div>
       ) : (
         <div
-          className="flex-1 bg-[#F7F5EF]"
+          className="flex-1 bg-[#181414]"
           style={{ height: "calc(100vh - 130px)" }}
         />
       )}
 
       {fallbackMode && !noTabs && (
-        <div className="bg-yellow-100 text-yellow-800 p-2 text-sm">
+        <div className="bg-yellow-900 text-yellow-200 p-2 text-sm">
           Running in browser preview mode. For full functionality, launch the
           Electron build.
         </div>
