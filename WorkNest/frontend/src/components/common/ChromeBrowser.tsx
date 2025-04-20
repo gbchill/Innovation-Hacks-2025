@@ -1,11 +1,18 @@
-import { useState, useEffect } from 'react';
-import { PlusIcon, XMarkIcon, HomeIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect } from "react";
+import {
+  PlusIcon,
+  XMarkIcon,
+  HomeIcon
+} from "@heroicons/react/24/outline";
 
-// Declare the electronAPI interface
 declare global {
   interface Window {
     electronAPI?: {
-      createBrowserView: (url?: string, sidebarWidth?: number, preferredColorScheme?: string) => void;
+      createBrowserView: (
+        url?: string,
+        sidebarWidth?: number,
+        preferredColorScheme?: string
+      ) => void;
       removeBrowserView: () => void;
       browserGoBack: () => void;
       browserGoForward: () => void;
@@ -33,8 +40,9 @@ interface NavigationState {
 
 interface ChromeBrowserProps {
   initialUrl?: string;
-  sidebarWidth?: number;
-  sidebarCollapsed?: boolean;
+  sidebarWidth: number;              // ← always the exact pixel width
+  sidebarCollapsed: boolean;         // kept for parent‑child consistency
+  isDarkMode: boolean;
 }
 
 interface Tab {
@@ -43,283 +51,194 @@ interface Tab {
   title: string;
 }
 
-const ChromeBrowser: React.FC<ChromeBrowserProps> = ({ 
-  initialUrl = 'https://www.google.com',
-  sidebarWidth = 64, // default width in pixels when sidebar is not collapsed
-  sidebarCollapsed = false
+const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
+  initialUrl = "https://www.google.com",
+  sidebarWidth,
+  sidebarCollapsed, // eslint-disable-line @typescript-eslint/no-unused-vars
+  isDarkMode
 }) => {
-  // Tab management
+  /* ---------- tab + nav state ---------- */
   const [tabs, setTabs] = useState<Tab[]>([
-    { id: '1', url: initialUrl, title: 'Google' }
+    { id: "1", url: initialUrl, title: "Google" }
   ]);
-  const [activeTabId, setActiveTabId] = useState<string>('1');
-  
-  // URL and navigation state
+  const [activeTabId, setActiveTabId] = useState<string>("1");
   const [inputUrl, setInputUrl] = useState(initialUrl);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isElectron, setIsElectron] = useState(false);
   const [fallbackMode, setFallbackMode] = useState(false);
-  
-  // Track if there are no tabs open
   const [noTabs, setNoTabs] = useState(false);
-  
-  // Add state for color scheme preference
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  
-  const actualSidebarWidth = sidebarCollapsed ? 0 : sidebarWidth;
-  
-  // Get the active tab
-  const activeTab = tabs.find(tab => tab.id === activeTabId) || tabs[0];
 
-  // Check if running in Electron
+  /* -------------- IMPORTANT LINE -------------- */
+  const actualSidebarWidth = sidebarWidth; // ← use whatever the parent sends
+  /* -------------------------------------------- */
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+
+  /* ---------- environment checks ---------- */
   useEffect(() => {
-    const isRunningInElectron = window.electronAPI !== undefined;
-    setIsElectron(isRunningInElectron);
-    
-    if (!isRunningInElectron) {
-      console.log('Running in browser mode (not Electron). Using fallback mode with iframe.');
-      setFallbackMode(true);
-    }
+    const runningElectron = window.electronAPI !== undefined;
+    setIsElectron(runningElectron);
+    if (!runningElectron) setFallbackMode(true);
   }, []);
 
-  // Handle tabs state
+  /* ---------- tabs existence ---------- */
   useEffect(() => {
     if (tabs.length === 0) {
       setNoTabs(true);
-      
-      // Hide browser view if in Electron mode
-      if (isElectron && !fallbackMode) {
-        window.electronAPI?.removeBrowserView();
-      }
+      if (isElectron && !fallbackMode) window.electronAPI?.removeBrowserView();
     } else {
       setNoTabs(false);
     }
   }, [tabs.length, isElectron, fallbackMode]);
 
-  // Initialize browser view when component mounts - only in Electron
+  /* ---------- electron listeners ---------- */
   useEffect(() => {
     if (!isElectron || fallbackMode || noTabs) return;
 
-    // Set up event listeners
-    window.electronAPI?.onBrowserViewCreated((id) => {
-      console.log('Browser view created with ID:', id);
-    });
+    window.electronAPI?.onBrowserViewCreated((id) =>
+      console.log("BrowserView ID:", id)
+    );
 
-    window.electronAPI?.onCurrentUrl((currentUrl) => {
-      // Update the URL for the active tab
-      setTabs(prevTabs => 
-        prevTabs.map(tab => 
-          tab.id === activeTabId 
-            ? { ...tab, url: currentUrl } 
-            : tab
-        )
+    window.electronAPI?.onCurrentUrl((url) => {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === activeTabId ? { ...t, url } : t))
       );
-      setInputUrl(currentUrl);
+      setInputUrl(url);
     });
 
     window.electronAPI?.onNavigationState((state) => {
       setCanGoBack(state.canGoBack);
       setCanGoForward(state.canGoForward);
       setIsLoading(state.isLoading);
-      
-      // Update the URL for the active tab
-      setTabs(prevTabs => 
-        prevTabs.map(tab => 
-          tab.id === activeTabId 
-            ? { ...tab, url: state.currentUrl } 
-            : tab
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTabId ? { ...t, url: state.currentUrl } : t
         )
       );
       setInputUrl(state.currentUrl);
     });
-    
-    // Handle page title updates
+
     window.electronAPI?.onPageTitleUpdated((title) => {
-      // Update the title for the active tab
-      setTabs(prevTabs => 
-        prevTabs.map(tab => 
-          tab.id === activeTabId 
-            ? { ...tab, title: title || getTabTitle(tab.url) } 
-            : tab
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTabId
+            ? { ...t, title: title || getTabTitle(t.url) }
+            : t
         )
       );
     });
 
-    // Create the browser view with sidebar width information and color scheme
     window.electronAPI?.createBrowserView(
-      activeTab.url, 
-      actualSidebarWidth, 
-      isDarkMode ? 'dark' : 'light'
+      activeTab.url,
+      actualSidebarWidth,
+      isDarkMode ? "dark" : "light"
     );
 
-    // Poll navigation state periodically
-    const intervalId = setInterval(() => {
+    const navPoll = setInterval(() => {
       window.electronAPI?.getNavigationState();
     }, 500);
 
-    // Clean up when component unmounts
     return () => {
-      clearInterval(intervalId);
+      clearInterval(navPoll);
       window.electronAPI?.removeAllListeners();
-      if (!noTabs) {
-        window.electronAPI?.removeBrowserView();
-      }
+      if (!noTabs) window.electronAPI?.removeBrowserView();
     };
   }, [activeTabId, actualSidebarWidth, isElectron, noTabs, isDarkMode]);
 
-  // Update browser view bounds when sidebar width changes - only in Electron
+  /* ---------- update bounds whenever width changes ---------- */
   useEffect(() => {
     if (!isElectron || fallbackMode || noTabs) return;
     window.electronAPI?.updateBrowserViewBounds(actualSidebarWidth);
   }, [actualSidebarWidth, isElectron, noTabs]);
 
-  // Navigation control handler for URL submission
-  const handleUrlSubmit = (e: React.FormEvent) => {
+  /* ---------- apply color‑scheme change ---------- */
+  useEffect(() => {
+    if (isElectron && !fallbackMode && !noTabs)
+      window.electronAPI?.setColorScheme(isDarkMode ? "dark" : "light");
+    if (fallbackMode && !noTabs) setTabs((prev) => [...prev]);
+  }, [isDarkMode, isElectron, fallbackMode, noTabs]);
+
+  /* ---------- navigation handlers ---------- */
+  const urlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Add https:// if the URL doesn't have a protocol
-    let processedUrl = inputUrl;
-    if (!/^https?:\/\//i.test(inputUrl)) {
-      processedUrl = `https://${inputUrl}`;
-    }
-    
-    // Update the URL for the active tab
-    setTabs(prevTabs => 
-      prevTabs.map(tab => 
-        tab.id === activeTabId 
-          ? { ...tab, url: processedUrl } 
-          : tab
-      )
+    let url = inputUrl;
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    setTabs((prev) =>
+      prev.map((t) => (t.id === activeTabId ? { ...t, url } : t))
     );
-    
-    if (isElectron && !fallbackMode && !noTabs) {
-      window.electronAPI?.browserNavigate(processedUrl);
-    }
+    if (isElectron && !fallbackMode && !noTabs)
+      window.electronAPI?.browserNavigate(url);
   };
+  const goBack = () =>
+    isElectron && !fallbackMode && !noTabs
+      ? window.electronAPI?.browserGoBack()
+      : null;
+  const goForward = () =>
+    isElectron && !fallbackMode && !noTabs
+      ? window.electronAPI?.browserGoForward()
+      : null;
+  const reload = () =>
+    isElectron && !fallbackMode && !noTabs
+      ? window.electronAPI?.browserReload()
+      : null;
 
-  // Navigation controls
-  const goBack = () => {
-    if (isElectron && !fallbackMode && !noTabs) {
-      window.electronAPI?.browserGoBack();
-    }
-  };
-
-  const goForward = () => {
-    if (isElectron && !fallbackMode && !noTabs) {
-      window.electronAPI?.browserGoForward();
-    }
-  };
-
-  const reload = () => {
-    if (isElectron && !fallbackMode && !noTabs) {
-      window.electronAPI?.browserReload();
-    }
-  };
-
-  // Toggle color scheme function
-  const toggleColorScheme = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    
-    if (isElectron && !fallbackMode && !noTabs) {
-      window.electronAPI?.setColorScheme(newMode ? 'dark' : 'light');
-    }
-    
-    // If using fallback mode with iframes, we can attempt to reload the iframe
-    // But this might not work with all websites due to browser security restrictions
-    if (fallbackMode && !noTabs) {
-      // Try to reload the active tab to apply new color scheme
-      setTabs(prevTabs => 
-        prevTabs.map(tab => 
-          tab.id === activeTabId 
-            ? { ...tab, url: tab.url } 
-            : tab
-        )
-      );
-    }
-  };
-
-  // Tab management functions
+  /* ---------- tab helpers ---------- */
   const addNewTab = () => {
-    const newTabId = Date.now().toString();
-    const newTab = {
-      id: newTabId,
-      url: 'https://www.google.com',
-      title: 'New Tab'
-    };
-    
+    const id = Date.now().toString();
+    const newTab = { id, url: "https://www.google.com", title: "New Tab" };
     setTabs([...tabs, newTab]);
-    setActiveTabId(newTabId);
-    setInputUrl('https://www.google.com');
-    
-    if (isElectron && !fallbackMode) {
-      window.electronAPI?.browserNavigate('https://www.google.com');
-    }
+    setActiveTabId(id);
+    setInputUrl(newTab.url);
+    if (isElectron && !fallbackMode)
+      window.electronAPI?.browserNavigate(newTab.url);
   };
-
-  const closeTab = (tabId: string, e: React.MouseEvent) => {
+  const closeTab = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    // Find the index of the tab to close
-    const tabIndex = tabs.findIndex(tab => tab.id === tabId);
-    
-    // Handle closing the last tab
+    const idx = tabs.findIndex((t) => t.id === id);
     if (tabs.length === 1) {
       setTabs([]);
       return;
     }
-    
-    // Determine the new active tab ID if closing the active tab
-    if (tabId === activeTabId) {
-      // If closing the last tab, activate the previous one
-      // Otherwise activate the next tab
-      const newActiveIndex = tabIndex === tabs.length - 1 ? tabIndex - 1 : tabIndex + 1;
-      setActiveTabId(tabs[newActiveIndex].id);
+    if (id === activeTabId) {
+      const newIdx = idx === tabs.length - 1 ? idx - 1 : idx + 1;
+      setActiveTabId(tabs[newIdx].id);
+      if (isElectron && !fallbackMode)
+        window.electronAPI?.browserNavigate(tabs[newIdx].url);
     }
-    
-    // Remove the tab
-    setTabs(tabs.filter(tab => tab.id !== tabId));
+    setTabs(tabs.filter((t) => t.id !== id));
+  };
+  const switchTab = (id: string) => {
+    if (id === activeTabId) return;
+    setActiveTabId(id);
+    const t = tabs.find((x) => x.id === id);
+    if (t && isElectron && !fallbackMode)
+      window.electronAPI?.browserNavigate(t.url);
   };
 
-  const switchTab = (tabId: string) => {
-    if (tabId === activeTabId) return;
-    
-    setActiveTabId(tabId);
-    const tab = tabs.find(tab => tab.id === tabId);
-    if (tab) {
-      setInputUrl(tab.url);
-      
-      if (isElectron && !fallbackMode) {
-        window.electronAPI?.browserNavigate(tab.url);
-      }
-    }
-  };
-
-  // Extract domain name for tab title
   const getTabTitle = (url: string) => {
     try {
-      const domain = new URL(url).hostname.replace('www.', '');
-      return domain || 'New Tab';
+      return new URL(url).hostname.replace("www.", "") || "New Tab";
     } catch {
-      return 'New Tab';
+      return "New Tab";
     }
   };
 
+  /* ---------- render ---------- */
   return (
     <div className="w-full h-full flex flex-col bg-[#F7F5EF]">
       {/* Tabs bar */}
       <div className="flex items-center bg-[#F7F5EF] border-b">
         <div className="flex-1 flex overflow-x-auto">
-          {tabs.map(tab => (
+          {tabs.map((tab) => (
             <div
               key={tab.id}
               onClick={() => switchTab(tab.id)}
               className={`flex items-center min-w-[140px] max-w-[240px] px-3 py-2 border-r cursor-pointer ${
-                tab.id === activeTabId 
-                  ? 'bg-[#F7F5EF] text-gray-900 font-medium' 
-                  : 'bg-[#F7F5EF] text-gray-700 hover:bg-gray-100'
+                tab.id === activeTabId
+                  ? "bg-[#F7F5EF] text-gray-900 font-medium"
+                  : "bg-[#F7F5EF] text-gray-700 hover:bg-gray-100"
               }`}
             >
               <div className="truncate flex-1 text-black">
@@ -333,8 +252,6 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
               </button>
             </div>
           ))}
-          
-          {/* Plus button positioned right after the last tab */}
           <button
             onClick={addNewTab}
             className="p-2 mx-1 text-gray-700 hover:bg-gray-100 rounded flex-shrink-0"
@@ -344,104 +261,106 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
         </div>
       </div>
 
-      {/* URL bar and navigation controls */}
+      {/* URL + nav */}
       <div className="flex items-center p-2 bg-[#F7F5EF] border-b">
-        <button 
-          onClick={goBack} 
+        <button
+          onClick={goBack}
           disabled={!canGoBack || fallbackMode || noTabs}
-          className={`p-2 rounded ${(!fallbackMode && canGoBack && !noTabs) ? 'text-gray-700 hover:bg-gray-200' : 'text-gray-400'}`}
+          className={`p-2 rounded ${
+            canGoBack && !fallbackMode && !noTabs
+              ? "text-gray-700 hover:bg-gray-200"
+              : "text-gray-400"
+          }`}
         >
           ←
         </button>
-        <button 
-          onClick={goForward} 
+        <button
+          onClick={goForward}
           disabled={!canGoForward || fallbackMode || noTabs}
-          className={`p-2 rounded ${(!fallbackMode && canGoForward && !noTabs) ? 'text-gray-700 hover:bg-gray-200' : 'text-gray-400'}`}
+          className={`p-2 rounded ${
+            canGoForward && !fallbackMode && !noTabs
+              ? "text-gray-700 hover:bg-gray-200"
+              : "text-gray-400"
+          }`}
         >
           →
         </button>
-        <button 
-          onClick={reload} 
+        <button
+          onClick={reload}
           disabled={fallbackMode || noTabs}
-          className={`p-2 rounded ${(!fallbackMode && !noTabs) ? 'text-gray-700 hover:bg-gray-200' : 'text-gray-400'}`}
+          className={`p-2 rounded ${
+            !fallbackMode && !noTabs
+              ? "text-gray-700 hover:bg-gray-200"
+              : "text-gray-400"
+          }`}
         >
           ↻
         </button>
-        
-        {/* Color scheme toggle button */}
-        <button
-          onClick={toggleColorScheme}
-          disabled={fallbackMode || noTabs}
-          className={`p-2 rounded ${(!fallbackMode && !noTabs) ? 'text-gray-700 hover:bg-gray-200' : 'text-gray-400'}`}
-          aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {isDarkMode ? (
-            <SunIcon className="h-5 w-5" />
-          ) : (
-            <MoonIcon className="h-5 w-5" />
-          )}
-        </button>
-        
-        <form onSubmit={handleUrlSubmit} className="flex-1 ml-2">
+
+        <form onSubmit={urlSubmit} className="flex-1 ml-2">
           <input
             type="text"
             value={inputUrl}
             onChange={(e) => setInputUrl(e.target.value)}
             onKeyDown={(e) => {
-              // Make sure deletion works
-              if (e.key === 'Backspace' || e.key === 'Delete') {
+              if (e.key === "Backspace" || e.key === "Delete")
                 e.stopPropagation();
-              }
             }}
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-500 text-black"
-            placeholder="Enter URL..."
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29] text-black"
+            placeholder="Enter URL…"
             disabled={noTabs}
           />
         </form>
         {isLoading && !fallbackMode && !noTabs && (
-          <div className="ml-2 text-green-600">Loading...</div>
+          <div className="ml-2 text-gray-600">Loading…</div>
         )}
       </div>
-      
-      {/* Content area */}
+
+      {/* Content */}
       {noTabs ? (
-        <div className="flex-1 bg-[#F7F5EF] flex flex-col items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center bg-[#F7F5EF]">
           <div className="text-center max-w-md p-6 bg-gray-50 rounded-lg shadow-sm">
             <HomeIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-medium text-gray-800 mb-2">No Open Tabs</h2>
-            <p className="text-gray-600 mb-6">Open a new tab to start browsing.</p>
+            <h2 className="text-xl font-medium text-gray-800 mb-2">
+              No Open Tabs
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Open a new tab to start browsing.
+            </p>
             <button
               onClick={addNewTab}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center mx-auto"
+              className="px-4 py-2 bg-[#1B3B29] text-white rounded hover:opacity-90 transition-colors flex items-center mx-auto"
             >
-              <PlusIcon className="h-4 w-4 mr-2" />
-              New Tab
+              <PlusIcon className="h-4 w-4 mr-2" /> New Tab
             </button>
           </div>
         </div>
       ) : fallbackMode ? (
         <div className="flex-1 bg-[#F7F5EF]">
-          {tabs.map(tab => (
-            <iframe 
+          {tabs.map((tab) => (
+            <iframe
               key={tab.id}
-              src={tab.url} 
+              src={tab.url}
               className="w-full h-full border-0"
               title={`Browser Tab ${tab.id}`}
-              style={{ 
-                display: tab.id === activeTabId ? 'block' : 'none',
-                height: 'calc(100vh - 130px)' 
+              style={{
+                display: tab.id === activeTabId ? "block" : "none",
+                height: "calc(100vh - 130px)"
               }}
             />
           ))}
         </div>
       ) : (
-        /* The actual browser content is rendered by Electron in the main process */
-        <div className="flex-1 bg-[#F7F5EF]" style={{ height: 'calc(100vh - 130px)' }}></div>
+        <div
+          className="flex-1 bg-[#F7F5EF]"
+          style={{ height: "calc(100vh - 130px)" }}
+        />
       )}
-      
+
       {fallbackMode && !noTabs && (
         <div className="bg-yellow-100 text-yellow-800 p-2 text-sm">
-          Running in browser preview mode. For full browser functionality, launch in Electron.
+          Running in browser preview mode. For full functionality, launch the
+          Electron build.
         </div>
       )}
     </div>

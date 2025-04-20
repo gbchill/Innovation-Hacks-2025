@@ -1,91 +1,149 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Logo from "/logo.png";
+import {
+  Bars3Icon,
+  MoonIcon,
+  SunIcon,
+  NoSymbolIcon,
+  ClockIcon
+} from "@heroicons/react/24/outline";
 
 const menuItems = [
   { name: "Dashboard", path: "/" },
   { name: "Calendar", path: "/calendar" },
   { name: "Tasks", path: "/tasks" },
-  { name: "Deep Work", path: "/deepwork" },
+  { name: "Deep Work", path: "/deepwork" }
 ];
 
 interface SidebarProps {
   onToggle?: (collapsed: boolean) => void;
+  isDarkMode: boolean;
+  toggleColorScheme: () => void;
 }
 
-function Sidebar({ onToggle }: SidebarProps) {
+function Sidebar({
+  onToggle,
+  isDarkMode,
+  toggleColorScheme
+}: SidebarProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
   const toggleSidebar = () => {
-    const newState = !collapsed;
-    setCollapsed(newState);
-    onToggle?.(newState);
+    const next = !collapsed;
+    setCollapsed(next);
+    onToggle?.(next);
   };
 
-  // ensure parent knows initial state
-  useEffect(() => { onToggle?.(collapsed); }, []);
+  useEffect(() => {
+    onToggle?.(collapsed);
+  }, []);
+
+  /* utility: choose text color per state */
+  const iconColor = collapsed ? "text-gray-700" : "text-[#1B3B29]";
 
   return (
-    <div className="relative h-full z-30">
+    <div className="h-full z-30">
       <div
-        className={`bg-[#F7F5EF] h-full flex flex-col transition-all duration-500 ease-in-out ${
-          collapsed ? "w-0 overflow-hidden" : "w-64 p-6"
-        }`}
+        className={`
+          bg-[#F7F5EF] h-full flex flex-col transition-all duration-500 ease-in-out
+          ${collapsed ? "w-16 p-2" : "w-48 p-4"}
+        `}
         style={{
-          // inset shadow along the right edge
-          boxShadow: collapsed
-            ? "none"
-            : "inset -4px 0 8px -2px rgba(0,0,0,0.2)",
+          boxShadow: "inset -4px 0 8px -2px rgba(0,0,0,0.18)"
         }}
       >
-        {!collapsed && (
-          <>
-            <div className="flex items-center gap-3 mb-10">
+        {/* burger + logo row */}
+        <div
+          className={`
+            flex items-center ${collapsed ? "justify-center" : "justify-between"}
+            mb-6
+          `}
+        >
+          <button
+            onClick={toggleSidebar}
+            className="p-1 rounded hover:bg-[#DAD5C4] transition"
+            title={collapsed ? "Expand" : "Collapse"}
+          >
+            <Bars3Icon className={`h-6 w-6 ${iconColor}`} />
+          </button>
+
+          {!collapsed && (
+            <div className="flex items-center gap-2">
               <img
                 src={Logo}
+                className="w-8 h-8 rounded-full shadow-sm"
                 alt="WorkNest Logo"
-                className="w-12 h-12 rounded-full shadow-sm"
               />
-              <h2 className="text-3xl font-bold text-[#1B3B29] tracking-wide">
-                WorkNest
-              </h2>
+              <h2 className="text-lg font-bold text-[#1B3B29]">WorkNest</h2>
             </div>
-            <nav className="flex flex-col gap-4">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.path}
-                  className={`
-                    text-left px-4 py-3 rounded-xl font-semibold transition-all duration-300
-                    ${
-                      location.pathname === item.path
-                        ? "bg-[#1B3B29] text-white shadow-md"
-                        : "text-[#3D3D3D] hover:bg-[#DAD5C4] hover:text-[#1B3B29]"
-                    }
-                  `}
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </nav>
-          </>
-        )}
-      </div>
+          )}
+        </div>
 
-      {/* Toggle button */}
-      <button
-        onClick={toggleSidebar}
-        className={`
-          absolute top-6 -right-5 w-10 h-10 rounded-r-full 
-          bg-[#1B3B29] text-white flex items-center justify-center
-          shadow-md hover:bg-[#145A32] active:scale-90 transition-all duration-300
-          z-40
-        `}
-        title={collapsed ? "Open Sidebar" : "Close Sidebar"}
-      >
-        {collapsed ? "➔" : "←"}
-      </button>
+        {/* icon strip */}
+        <div
+          className={`
+            ${collapsed
+              ? "flex flex-col gap-5 items-center"
+              : "flex justify-center gap-6 mb-6 px-2"}
+          `}
+        >
+          <button
+            onClick={toggleColorScheme}
+            className="p-2 rounded hover:bg-[#DAD5C4] transition"
+            title={isDarkMode ? "Light mode" : "Dark mode"}
+          >
+            {isDarkMode ? (
+              <SunIcon className={`h-6 w-6 ${iconColor}`} />
+            ) : (
+              <MoonIcon className={`h-6 w-6 ${iconColor}`} />
+            )}
+          </button>
+
+          <button
+            className="p-2 rounded hover:bg-[#DAD5C4] transition"
+            title="Block sites"
+          >
+            <NoSymbolIcon className={`h-6 w-6 ${iconColor}`} />
+          </button>
+
+          <button
+            className="p-2 rounded hover:bg-[#DAD5C4] transition"
+            title="Focus timer"
+          >
+            <ClockIcon className={`h-6 w-6 ${iconColor}`} />
+          </button>
+        </div>
+
+        {/* nav menu */}
+        <nav className="flex flex-col gap-3 mt-2">
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            const itemClasses = collapsed
+              ? // mini‑sidebar: neutral look, no green block
+                "justify-center text-gray-700 hover:bg-[#DAD5C4]"
+              : isActive
+              ? // expanded + active
+                "bg-[#1B3B29] text-white shadow"
+              : // expanded + inactive
+                "text-[#3D3D3D] hover:bg-[#DAD5C4] hover:text-[#1B3B29]";
+
+            return (
+              <Link
+                key={item.name}
+                to={item.path}
+                className={`
+                  flex items-center gap-3 px-3 py-2 rounded-xl font-semibold transition-all
+                  ${itemClasses}
+                `}
+              >
+                {!collapsed && item.name}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </div>
   );
 }
