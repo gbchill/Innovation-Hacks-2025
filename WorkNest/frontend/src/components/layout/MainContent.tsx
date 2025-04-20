@@ -1,8 +1,8 @@
 function MainContent() {
   return (
-    <div className="flex-1 bg-[#F7F5EF] p-8 overflow-y-auto">
+    <div className="flex-1 bg-[#181414] p-8 overflow-y-auto">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold text-[#1B3B29] mb-6">
+        <h1 className="text-4xl font-bold text-[#fdfdfd] mb-6">
           Dashboard
         </h1>
         <p className="text-lg text-[#4F4F4F]">
