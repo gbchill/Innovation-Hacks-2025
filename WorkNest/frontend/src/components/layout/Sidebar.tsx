@@ -161,9 +161,14 @@ function Sidebar({
             const isActive = location.pathname === item.path;
             const ItemIcon = item.icon;
             
+            // Determine color based on active state
+            const iconColorForNav = isActive ? "text-white" : collapsed ? "text-gray-700" : "text-[#3D3D3D]";
+            
             const itemClasses = collapsed
-              ? // mini‑sidebar: neutral look, no green block
-                "justify-center text-gray-700 hover:bg-[#DAD5C4]"
+              ? // mini-sidebar: Use green background for active item
+                isActive 
+                ? "justify-center bg-[#1B3B29] text-white shadow" 
+                : "justify-center text-gray-700 hover:bg-[#DAD5C4]"
               : isActive
               ? // expanded + active
                 "bg-[#1B3B29] text-white shadow"
@@ -181,7 +186,7 @@ function Sidebar({
                 title={item.name}
               >
                 {collapsed ? (
-                  <ItemIcon className="h-6 w-6" />
+                  <ItemIcon className={`h-6 w-6 ${iconColorForNav}`} />
                 ) : (
                   item.name
                 )}
