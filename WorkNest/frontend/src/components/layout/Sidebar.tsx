@@ -77,7 +77,7 @@ function Sidebar({
         <div
           className={`
             flex items-center ${collapsed ? "justify-center" : "justify-between"}
-            mb-6
+            mb-4
           `}
         >
           <button
@@ -100,49 +100,45 @@ function Sidebar({
           )}
         </div>
 
-        {/* icon strip */}
+        {/* icon strip with reduced padding */}
         <div
           className={`
             ${collapsed
-              ? "flex flex-col gap-5 items-center"
-              : "flex justify-center gap-6 mb-6 px-2"}
+              ? "flex flex-col gap-3 items-center"
+              : "flex justify-center gap-4 mb-4 px-2"}
           `}
         >
+          {/* Even more compact padding */}
           <button
             onClick={() => !collapsed && setShowBlockSitePopup(true)}
-            className="p-2 rounded hover:bg-[#242424] transition"
+            className="p-1 rounded hover:bg-[#242424] transition"
             title="Block sites"
           >
-            <NoSymbolIcon className={`h-6 w-6 ${iconColor}`} />
+            <NoSymbolIcon className={`h-5 w-5 ${iconColor}`} />
           </button>
 
+          {/* Even more compact padding */}
           <button
             onClick={toggleFocusTimer}
-            className="p-2 rounded hover:bg-[#242424] transition"
+            className="p-1 rounded hover:bg-[#242424] transition"
             title="Focus timer"
           >
-            <ClockIcon className={`h-6 w-6 ${iconColor}`} />
+            <ClockIcon className={`h-5 w-5 ${iconColor}`} />
           </button>
         </div>
 
         {/* Horizontal divider */}
-        <div className={`${collapsed ? "mx-1 my-3" : "mx-2 my-3"}`}>
+        <div className={`${collapsed ? "mx-1 my-2" : "mx-2 my-2"}`}>
           <div className="border-t border-gray-700"></div>
         </div>
 
         {/* nav menu */}
-        <nav className="flex flex-col gap-3 mt-2">
+        <nav className="flex flex-col gap-2 mt-2">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
             const ItemIcon = item.icon;
 
-            // always white by default
-            const iconColorForNav = isActive ? "text-white" : "text-white";
-
-            // if hovered (bg-[#242424]), force text back to dark
             const hoverTextDark = "hover:text-white";
-
-            // collapsed vs expanded, active vs inactive
             const itemClasses = collapsed
               ? isActive
                 ? "justify-center bg-[#1B3B29] text-white shadow"
@@ -162,7 +158,7 @@ function Sidebar({
                 title={item.name}
               >
                 {collapsed ? (
-                  <ItemIcon className={`h-6 w-6 ${iconColorForNav}`} />
+                  <ItemIcon className="h-6 w-6 text-white" />
                 ) : (
                   item.name
                 )}
@@ -184,7 +180,6 @@ function Sidebar({
               <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
-
           <div className="mt-2">
             <FocusTimer onTimerRunning={onTimerRunning} />
           </div>
@@ -203,7 +198,6 @@ function Sidebar({
               <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
-
           <form onSubmit={handleBlockSite}>
             <div className="mb-4">
               <label htmlFor="blockUrl" className="block text-white mb-2">
@@ -221,7 +215,6 @@ function Sidebar({
                 URLs will be blocked in all browser tabs
               </p>
             </div>
-
             <div className="flex justify-end">
               <button
                 type="submit"
