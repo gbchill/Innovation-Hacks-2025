@@ -108,7 +108,6 @@ const InteractiveTodo: React.FC = () => {
 
     setColumns(prev => {
       if (modalPriority === columnId) {
-        // same column
         return {
           ...prev,
           [columnId]: {
@@ -119,7 +118,6 @@ const InteractiveTodo: React.FC = () => {
           },
         };
       }
-      // move to new column
       return {
         ...prev,
         [columnId]: {
@@ -159,19 +157,93 @@ const InteractiveTodo: React.FC = () => {
   };
   // ────────────────────────────────────────────────────────────────────────
 
+  // ─── AI Sort ────────────────────────────────────────────────────────────
+  const handleAISort = async (colId: AllColumnId) => {
+    const api: any = window.electronAPI;
+    if (!api?.generateAI) return;
+
+    setSortingCol(colId);
+    try {
+      const tasks = columns[colId].tasks.map(t => t.content).join(', ');
+      const prompt = [
+        `Reorder these tasks by priority (highest first).`,
+        `Return a comma-separated list in the new order.`,
+        `Tasks: ${tasks}`
+      ].join('\n');
+      const { text } = await api.generateAI(prompt);
+      const ordered = text.split(',').map(s => s.trim()).filter(s => s);
+
+      const newTasks = ordered
+        .map(content => columns[colId].tasks.find(t => t.content === content))
+        .filter((t): t is Task => Boolean(t));
+
+      columns[colId].tasks.forEach(t => {
+        if (!newTasks.find(nt => nt.id === t.id)) newTasks.push(t);
+      });
+
+      setColumns(prev => ({
+        ...prev,
+        [colId]: { ...prev[colId], tasks: newTasks }
+      }));
+    } finally {
+      setSortingCol(null);
+    }
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ─── Decompose ─────────────────────────────────────────────────────────
+  const handleDecompose = async (colId: AllColumnId, task: Task) => {
+    const api: any = window.electronAPI;
+    if (!api?.generateAI) return;
+
+    setDecomposing(task.id);
+    try {
+      const prompt = [
+        `Split this task into exactly three concise micro‑tasks.`,
+        `Do NOT include the original task text.`,
+        `Respond with the three subtasks separated by commas, with no numbering or JSON.`,
+        `Task: "${task.content}"`
+      ].join('\n');
+      const { text } = await api.generateAI(prompt);
+      const cleaned = text.replace(/```.*?```/g, '').trim();
+      const subs = cleaned.includes(',')
+        ? cleaned.split(',').map(s => s.trim()).filter(s => s)
+        : cleaned.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+
+      const newTasks: Task[] = subs.slice(0, 3).map((content, i) => ({
+        id: `${task.id}-sub-${Date.now()}-${i}`, content
+      }));
+
+      setColumns(prev => {
+        const col   = prev[colId];
+        const idx   = col.tasks.findIndex(t => t.id === task.id);
+        if (idx < 0) return prev;
+        const updated = [
+          ...col.tasks.slice(0, idx+1),
+          ...newTasks,
+          ...col.tasks.slice(idx+1),
+        ];
+        return { ...prev, [colId]: { ...col, tasks: updated } };
+      });
+    } finally {
+      setDecomposing(null);
+    }
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
   return (
     <div className="bg-[#181414] min-h-screen p-4 flex justify-center items-start">
       <div className="w-full max-w-7xl">
-        {/* Add new task */}
+        {/* Add new */}
         <div className="flex gap-2 max-w-xl mx-auto mb-4">
           <input
-            className="flex-1 border border-gray-700 bg-[#242424] text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
+            className="flex-1 bg-[#242424] border border-gray-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
             placeholder="New task..."
             value={newTask}
             onChange={e => setNewTask(e.target.value)}
           />
           <select
-            className="border border-gray-700 bg-[#242424] text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
+            className="bg-[#242424] border border-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
             value={targetColumn}
             onChange={e => setTargetColumn(e.target.value as ColumnId)}
           >
@@ -201,7 +273,7 @@ const InteractiveTodo: React.FC = () => {
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="font-bold text-white">{col.title}</h3>
                       <button
-                        onClick={() => handleAISuggestPriority()}
+                        onClick={() => handleAISort(colId as AllColumnId)}
                         disabled={sortingCol === colId}
                         className="text-purple-400 hover:underline text-sm"
                       >
@@ -303,7 +375,6 @@ const InteractiveTodo: React.FC = () => {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );
