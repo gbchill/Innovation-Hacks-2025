@@ -6,7 +6,8 @@ import {
   MoonIcon,
   SunIcon,
   NoSymbolIcon,
-  ClockIcon
+  ClockIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 
 const menuItems = [
@@ -29,11 +30,21 @@ function Sidebar({
 }: SidebarProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [showBlockSitePopup, setShowBlockSitePopup] = useState(false);
+  const [blockUrl, setBlockUrl] = useState("");
 
   const toggleSidebar = () => {
     const next = !collapsed;
     setCollapsed(next);
     onToggle?.(next);
+  };
+
+  const handleBlockSite = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Here would go the functionality to actually block the site
+    // For now, we'll just clear the input and close the popup
+    setBlockUrl("");
+    setShowBlockSitePopup(false);
   };
 
   useEffect(() => {
@@ -44,7 +55,7 @@ function Sidebar({
   const iconColor = collapsed ? "text-gray-700" : "text-[#1B3B29]";
 
   return (
-    <div className="h-full z-30">
+    <div className="h-full z-30 relative">
       <div
         className={`
           bg-[#F7F5EF] h-full flex flex-col transition-all duration-500 ease-in-out
@@ -102,6 +113,7 @@ function Sidebar({
           </button>
 
           <button
+            onClick={() => !collapsed && setShowBlockSitePopup(true)}
             className="p-2 rounded hover:bg-[#DAD5C4] transition"
             title="Block sites"
           >
@@ -144,6 +156,51 @@ function Sidebar({
           })}
         </nav>
       </div>
+
+      {/* Block Site Popup - Only shown when sidebar is expanded */}
+      {!collapsed && showBlockSitePopup && (
+        <div className="absolute top-1/2 left-0 w-full transform -translate-y-1/2 px-4">
+          <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-[#1B3B29] font-semibold text-sm">Block Website</h3>
+              <button 
+                onClick={() => setShowBlockSitePopup(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleBlockSite}>
+              <div className="mb-3">
+                <label htmlFor="blockUrl" className="block text-xs text-gray-600 mb-1">
+                  Enter URL to block:
+                </label>
+                <input
+                  type="text"
+                  id="blockUrl"
+                  value={blockUrl}
+                  onChange={(e) => setBlockUrl(e.target.value)}
+                  placeholder="example.com"
+                  className="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-[#1B3B29] text-gray-900"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  URLs will be blocked in all browser tabs
+                </p>
+              </div>
+              
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 bg-[#1B3B29] text-white text-xs rounded hover:bg-opacity-90 transition-colors"
+                >
+                  Block Site
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
