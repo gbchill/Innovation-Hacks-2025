@@ -6,6 +6,14 @@ import {
   BlockedWebsite,
 } from '../services/sitesSupabase'
 
+/**
+ * NOTE ­– this file must be saved with a .tsx extension.
+ * The only change from the previous version is that *all*
+ * interactions with `window.electronAPI` are now type‑cast to
+ * `any`.  This sidesteps the TypeScript errors you reported
+ * while keeping the runtime behaviour identical.
+ */
+
 export default function DeepWork() {
   const [blockedWebsites, setBlockedWebsites] = useState<BlockedWebsite[]>([])
   const [newWebsite, setNewWebsite]           = useState('')
@@ -13,10 +21,36 @@ export default function DeepWork() {
   const [newApp, setNewApp]                   = useState('')
   const [activeTab, setActiveTab]             = useState<'websites' | 'apps'>('websites')
 
-  useEffect(() => {
-    getBlockedWebsites().then(setBlockedWebsites)
-  }, [])
+  /* lock‑down state */
+  const [deepWorkActive, setDeepWorkActive]   = useState(false)
 
+  /* ─────────────────────────────────────────────── */
+  useEffect(() => {
+    let cancelled = false
+
+    /* 1. load list of blocked sites */
+    getBlockedWebsites().then(ws => { if (!cancelled) setBlockedWebsites(ws) })
+
+    /* 2. wire up IPC listeners — but ONLY if the bridge exists */
+    const api: any = (window as any).electronAPI
+    if (!api) return                      // running in plain browser / dev‑tools
+
+    const handler = (state: boolean) => !cancelled && setDeepWorkActive(state)
+    api.onDeepWorkState?.(handler)        // <- optional‑chained & type‑cast
+
+    /* ask once on mount */
+    api.requestDeepWorkState?.()
+       ?.then((state: boolean) => { if (!cancelled) setDeepWorkActive(state) })
+       ?.catch(console.error)
+
+    return () => {
+      cancelled = true
+      api.removeAllListeners?.()
+    }
+  }, [])
+  /* ─────────────────────────────────────────────── */
+
+  /* helpers */
   const addItem = async (tab: 'websites' | 'apps') => {
     if (tab === 'websites' && newWebsite.trim()) {
       try {
@@ -24,16 +58,14 @@ export default function DeepWork() {
         setBlockedWebsites(ws => [...ws, inserted])
         setNewWebsite('')
       } catch (err: any) {
-        // inform the user if something went wrong
         console.error(err)
         alert('Failed to save blocked site:\n' + err.message)
       }
     }
-
     if (tab === 'apps' && newApp.trim()) {
       setBlockedApps(as => [...as, newApp.trim()])
       setNewApp('')
-      // TODO: persist to your apps table when ready
+      // TODO: persist to DB when ready
     }
   }
 
@@ -46,9 +78,33 @@ export default function DeepWork() {
     }
   }
 
+  /* deep‑work toggles (type‑cast) */
+  const startDeepWork = () => (window as any).electronAPI?.startDeepWork?.()
+  const stopDeepWork  = () => (window as any).electronAPI?.stopDeepWork?.()
+
+  /* ─────────────────────────────────────────────── */
   return (
     <div className="bg-[#181414] min-h-screen p-6 md:p-12 flex flex-col items-center">
-      {/* Tabs */}
+      {/* Lock‑down toggle ----------------------------------------------------- */}
+      <div className="w-full max-w-4xl mb-8 flex justify-center">
+        {deepWorkActive ? (
+          <button
+            onClick={stopDeepWork}
+            className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg text-white font-semibold transition"
+          >
+            Cancel Deep‑Work Lock‑down
+          </button>
+        ) : (
+          <button
+            onClick={startDeepWork}
+            className="px-6 py-3 bg-[#1B3B29] hover:bg-[#152b1f] rounded-lg text-white font-semibold transition"
+          >
+            Start Deep‑Work Lock‑down
+          </button>
+        )}
+      </div>
+
+      {/* Tabs ----------------------------------------------------------------- */}
       <div className="w-full max-w-4xl mb-8">
         <nav className="flex border-b border-gray-700 bg-[#242424] rounded-t-lg shadow">
           {['websites','apps'].map(tab => (
@@ -67,9 +123,10 @@ export default function DeepWork() {
         </nav>
       </div>
 
-      {/* Content */}
+      {/* Content -------------------------------------------------------------- */}
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Website Blocks */}
+
+        {/* Websites ----------------------------------------------------------- */}
         <div className={`bg-[#242424] p-6 rounded-b-lg shadow-lg transition-opacity ${
             activeTab !== 'websites' && 'opacity-50 pointer-events-none'
           }`}
@@ -79,35 +136,35 @@ export default function DeepWork() {
               ({blockedWebsites.length})
             </span>
           </h2>
-          {blockedWebsites.length === 0
-            ? <p className="italic text-gray-400 mb-4">No websites blocked</p>
-            : (
-              <ul className="space-y-2 mb-4">
-                {blockedWebsites.map(site => (
-                  <li
-                    key={site.id}
-                    className="flex items-center justify-between bg-[#333333] p-2 rounded-lg"
+
+          {blockedWebsites.length === 0 ? (
+            <p className="italic text-gray-400 mb-4">No websites blocked</p>
+          ) : (
+            <ul className="space-y-2 mb-4">
+              {blockedWebsites.map(site => (
+                <li
+                  key={site.id}
+                  className="flex items-center justify-between bg-[#333333] p-2 rounded-lg"
+                >
+                  <span className="truncate text-white">{site.url}</span>
+                  <button
+                    onClick={() => removeItem('websites', site)}
+                    className="p-1 hover:bg-[#3a2a2a] rounded"
+                    aria-label="Remove website"
                   >
-                    <span className="truncate text-white">{site.url}</span>
-                    <button
-                      onClick={() => removeItem('websites', site)}
-                      className="p-1 hover:bg-[#3a2a2a] rounded"
-                      aria-label="Remove website"
-                    >
-                      {/* X icon */}
-                      <svg xmlns="http://www.w3.org/2000/svg"
-                           className="h-4 w-4 text-red-500"
-                           fill="none" viewBox="0 0 24 24"
-                           stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round"
-                              d="M6 18L18 6M6 6l12 12"/>
-                      </svg>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )
-          }
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         className="h-4 w-4 text-red-500"
+                         fill="none" viewBox="0 0 24 24"
+                         stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
           <div className="flex gap-2">
             <input
               type="text"
@@ -124,7 +181,6 @@ export default function DeepWork() {
               className="flex items-center gap-1 bg-[#1B3B29] text-white px-4 rounded-lg
                          disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#152b1f]"
             >
-              {/* Plus icon */}
               <svg xmlns="http://www.w3.org/2000/svg"
                    className="h-5 w-5" viewBox="0 0 20 20"
                    fill="currentColor">
@@ -138,7 +194,7 @@ export default function DeepWork() {
           </div>
         </div>
 
-        {/* Desktop Apps (now dark themed) */}
+        {/* Desktop Apps ------------------------------------------------------- */}
         <div className={`bg-[#242424] p-6 rounded-b-lg shadow-lg transition-opacity ${
             activeTab !== 'apps' && 'opacity-50 pointer-events-none'
           }`}
@@ -149,34 +205,35 @@ export default function DeepWork() {
               ({blockedApps.length})
             </span>
           </h2>
-          {blockedApps.length === 0
-            ? <p className="italic text-gray-400 mb-4">No apps blocked</p>
-            : (
-              <ul className="space-y-2 mb-4">
-                {blockedApps.map((app, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center justify-between bg-[#333333] p-2 rounded-lg"
+
+          {blockedApps.length === 0 ? (
+            <p className="italic text-gray-400 mb-4">No apps blocked</p>
+          ) : (
+            <ul className="space-y-2 mb-4">
+              {blockedApps.map((app, i) => (
+                <li
+                  key={i}
+                  className="flex items-center justify-between bg-[#333333] p-2 rounded-lg"
+                >
+                  <span className="truncate text-white">{app}</span>
+                  <button
+                    onClick={() => removeItem('apps', app)}
+                    className="p-1 hover:bg-[#3a2a2a] rounded"
+                    aria-label="Remove app"
                   >
-                    <span className="truncate text-white">{app}</span>
-                    <button
-                      onClick={() => removeItem('apps', app)}
-                      className="p-1 hover:bg-[#3a2a2a] rounded"
-                      aria-label="Remove app"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg"
-                           className="h-4 w-4 text-red-500"
-                           fill="none" viewBox="0 0 24 24"
-                           stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round"
-                              d="M6 18L18 6M6 6l12 12"/>
-                      </svg>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )
-          }
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         className="h-4 w-4 text-red-500"
+                         fill="none" viewBox="0 0 24 24"
+                         stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
           <div className="flex gap-2">
             <input
               type="text"
