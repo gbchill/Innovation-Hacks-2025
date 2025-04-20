@@ -4,14 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+  "dev": "vite",
+    "db":  "json-server --watch db.json --port 3001",
+    
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "date-fns": "^4.1.0",
+    "json-server": "^1.0.0-beta.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.5.1"
