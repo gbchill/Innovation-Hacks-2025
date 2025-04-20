@@ -120,7 +120,8 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
       if (isCurrentSiteBlocked) {
         // Block site by showing block screen
         setIsBlocked(true);
-        // Remove all tabs when blocked
+        
+        // Remove the browser view (immediately stops audio, etc.)
         if (isElectron && !fallbackMode) {
           window.electronAPI?.removeBrowserView();
         }
@@ -245,13 +246,21 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
   const addNewTab = () => {
     // Reset block state when adding a new tab
     setIsBlocked(false);
+    
+    // Clear any existing tabs when coming from blocked state
+    if (isBlocked) {
+      setTabs([]);
+    }
+    
     const id = Date.now().toString();
     const newTab = { id, url: "https://www.google.com", title: "New Tab" };
-    setTabs([...tabs, newTab]);
+    setTabs(prev => isBlocked ? [newTab] : [...prev, newTab]);
     setActiveTabId(id);
     setInputUrl(newTab.url);
-    if (isElectron && !fallbackMode)
+    
+    if (isElectron && !fallbackMode) {
       window.electronAPI?.browserNavigate(newTab.url);
+    }
   };
   
   const closeTab = (id: string, e: React.MouseEvent) => {
