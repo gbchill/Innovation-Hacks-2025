@@ -1,3 +1,4 @@
+// src/components/layout/Sidebar.tsx
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Logo from "/logo.png";
@@ -7,36 +8,52 @@ import {
   SunIcon,
   NoSymbolIcon,
   ClockIcon,
-  XMarkIcon
+  XMarkIcon,
+  HomeIcon,
+  CalendarIcon,
+  ClipboardDocumentCheckIcon,
+  LightBulbIcon
 } from "@heroicons/react/24/outline";
+import FocusTimer from "../common/FocusTimer";
 
 const menuItems = [
-  { name: "Dashboard", path: "/" },
-  { name: "Calendar", path: "/calendar" },
-  { name: "Tasks", path: "/tasks" },
-  { name: "Deep Work", path: "/deepwork" }
+  { name: "Dashboard", path: "/", icon: HomeIcon },
+  { name: "Calendar", path: "/calendar", icon: CalendarIcon },
+  { name: "Tasks", path: "/tasks", icon: ClipboardDocumentCheckIcon },
+  { name: "Deep Work", path: "/deepwork", icon: LightBulbIcon }
 ];
 
 interface SidebarProps {
   onToggle?: (collapsed: boolean) => void;
   isDarkMode: boolean;
   toggleColorScheme: () => void;
+  onTimerRunning: (isRunning: boolean) => void;
 }
 
 function Sidebar({
   onToggle,
   isDarkMode,
-  toggleColorScheme
+  toggleColorScheme,
+  onTimerRunning
 }: SidebarProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [showBlockSitePopup, setShowBlockSitePopup] = useState(false);
   const [blockUrl, setBlockUrl] = useState("");
+  const [showFocusTimer, setShowFocusTimer] = useState(false);
 
   const toggleSidebar = () => {
     const next = !collapsed;
     setCollapsed(next);
     onToggle?.(next);
+  };
+
+  const toggleFocusTimer = () => {
+    setShowFocusTimer(!showFocusTimer);
+    // Hide block site popup if it's showing
+    if (showBlockSitePopup) {
+      setShowBlockSitePopup(false);
+    }
   };
 
   const handleBlockSite = (e: React.FormEvent) => {
@@ -55,7 +72,7 @@ function Sidebar({
   const iconColor = collapsed ? "text-gray-700" : "text-[#1B3B29]";
 
   return (
-    <div className="h-full z-30 relative">
+    <div className="h-full relative">
       <div
         className={`
           bg-[#F7F5EF] h-full flex flex-col transition-all duration-500 ease-in-out
@@ -114,24 +131,36 @@ function Sidebar({
 
           <button
             onClick={() => !collapsed && setShowBlockSitePopup(true)}
-            className="p-2 rounded hover:bg-[#DAD5C4] transition"
+            className={`p-2 rounded hover:bg-[#DAD5C4] transition ${
+              showBlockSitePopup ? "bg-[#DAD5C4]" : ""
+            }`}
             title="Block sites"
           >
             <NoSymbolIcon className={`h-6 w-6 ${iconColor}`} />
           </button>
 
           <button
-            className="p-2 rounded hover:bg-[#DAD5C4] transition"
+            onClick={toggleFocusTimer}
+            className={`p-2 rounded hover:bg-[#DAD5C4] transition ${
+              showFocusTimer ? "bg-[#DAD5C4]" : ""
+            }`}
             title="Focus timer"
           >
             <ClockIcon className={`h-6 w-6 ${iconColor}`} />
           </button>
         </div>
 
+        {/* Horizontal divider */}
+        <div className={`${collapsed ? "mx-1 my-3" : "mx-2 my-3"}`}>
+          <div className="border-t border-gray-300"></div>
+        </div>
+
         {/* nav menu */}
         <nav className="flex flex-col gap-3 mt-2">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
+            const ItemIcon = item.icon;
+            
             const itemClasses = collapsed
               ? // mini‑sidebar: neutral look, no green block
                 "justify-center text-gray-700 hover:bg-[#DAD5C4]"
@@ -149,56 +178,78 @@ function Sidebar({
                   flex items-center gap-3 px-3 py-2 rounded-xl font-semibold transition-all
                   ${itemClasses}
                 `}
+                title={item.name}
               >
-                {!collapsed && item.name}
+                {collapsed ? (
+                  <ItemIcon className="h-6 w-6" />
+                ) : (
+                  item.name
+                )}
               </Link>
             );
           })}
         </nav>
       </div>
 
+      {/* Focus Timer Popup */}
+      {!collapsed && showFocusTimer && (
+        <div className="absolute inset-0 bg-[#F7F5EF] p-4 z-40">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-[#1B3B29] text-lg">Focus Timer</h3>
+            <button
+              onClick={toggleFocusTimer}
+              className="text-gray-500 hover:text-gray-700 p-1"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+          
+          <div className="mt-2">
+            <FocusTimer onTimerRunning={onTimerRunning} />
+          </div>
+        </div>
+      )}
+
       {/* Block Site Popup - Only shown when sidebar is expanded */}
       {!collapsed && showBlockSitePopup && (
-        <div className="absolute top-1/2 left-0 w-full transform -translate-y-1/2 px-4">
-          <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-[#1B3B29] font-semibold text-sm">Block Website</h3>
-              <button 
-                onClick={() => setShowBlockSitePopup(false)}
-                className="text-gray-500 hover:text-gray-700"
+        <div className="absolute inset-0 bg-[#F7F5EF] p-4 z-40">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-[#1B3B29] text-lg">Block Website</h3>
+            <button 
+              onClick={() => setShowBlockSitePopup(false)}
+              className="text-gray-500 hover:text-gray-700 p-1"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
+            
+          <form onSubmit={handleBlockSite}>
+            <div className="mb-4">
+              <label htmlFor="blockUrl" className="block text-sm text-gray-600 mb-2">
+                Enter URL to block:
+              </label>
+              <input
+                type="text"
+                id="blockUrl"
+                value={blockUrl}
+                onChange={(e) => setBlockUrl(e.target.value)}
+                placeholder="example.com"
+                className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B3B29] text-gray-900"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                URLs will be blocked in all browser tabs
+              </p>
+            </div>
+              
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="px-4 py-2 bg-[#1B3B29] text-white text-sm rounded-lg hover:bg-opacity-90 transition-colors"
               >
-                <XMarkIcon className="h-4 w-4" />
+                Block Site
               </button>
             </div>
-            
-            <form onSubmit={handleBlockSite}>
-              <div className="mb-3">
-                <label htmlFor="blockUrl" className="block text-xs text-gray-600 mb-1">
-                  Enter URL to block:
-                </label>
-                <input
-                  type="text"
-                  id="blockUrl"
-                  value={blockUrl}
-                  onChange={(e) => setBlockUrl(e.target.value)}
-                  placeholder="example.com"
-                  className="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-[#1B3B29] text-gray-900"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  URLs will be blocked in all browser tabs
-                </p>
-              </div>
-              
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 bg-[#1B3B29] text-white text-xs rounded hover:bg-opacity-90 transition-colors"
-                >
-                  Block Site
-                </button>
-              </div>
-            </form>
-          </div>
+          </form>
         </div>
       )}
     </div>

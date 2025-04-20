@@ -8,7 +8,6 @@ import BrowserPage from "./pages/BrowserPage";
 import Calendar from "./pages/Calendar";
 import Tasks from "./pages/Tasks";
 import DeepWork from "./pages/DeepWork";
-import FocusTimer from "./components/common/FocusTimer";
 import AnimatedLoop from "./components/common/AnimatedLoop";
 
 /* -------------  keep numbers in sync with Sidebar.tsx ------------- */
@@ -24,6 +23,10 @@ function App() {
   const toggleColorScheme = () => setIsDarkMode((prev) => !prev);
   const handleSidebarToggle = (collapsed: boolean) =>
     setSidebarCollapsed(collapsed);
+  
+  const handleTimerRunning = (isRunning: boolean) => {
+    setTimerActive(isRunning);
+  };
 
   const sidebarWidth = sidebarCollapsed
     ? SIDEBAR_COLLAPSED
@@ -48,16 +51,12 @@ function App() {
             onToggle={handleSidebarToggle}
             isDarkMode={isDarkMode}
             toggleColorScheme={toggleColorScheme}
+            onTimerRunning={handleTimerRunning}
           />
         </div>
 
         {/* Main content */}
         <div className="flex-1 overflow-hidden relative">
-          {/* Top‑right floating Focus Timer */}
-          <div className="absolute top-4 right-4 z-30">
-            <FocusTimer onTimerRunning={setTimerActive} />
-          </div>
-
           <Routes>
             <Route
               path="/"
