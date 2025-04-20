@@ -1,3 +1,5 @@
+// src/pages/BrowserPage.tsx
+import React from "react";
 import ChromeBrowser from "../components/common/ChromeBrowser";
 
 interface BrowserPageProps {
@@ -9,7 +11,7 @@ interface BrowserPageProps {
 const BrowserPage: React.FC<BrowserPageProps> = ({
   sidebarWidth,
   sidebarCollapsed,
-  isDarkMode
+  isDarkMode,
 }) => {
   return (
     <div className="h-screen flex flex-col bg-[#F7F5EF]">

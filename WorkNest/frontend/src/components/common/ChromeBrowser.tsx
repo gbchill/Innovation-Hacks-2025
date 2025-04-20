@@ -1,9 +1,12 @@
+// src/components/common/ChromeBrowser.tsx
 import { useState, useEffect } from "react";
 import {
   PlusIcon,
   XMarkIcon,
-  HomeIcon
+  HomeIcon,
+  NoSymbolIcon
 } from "@heroicons/react/24/outline";
+import { getBlockedWebsites } from "../../services/sitesSupabase";
 
 declare global {
   interface Window {
@@ -63,18 +66,69 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
   ]);
   const [activeTabId, setActiveTabId] = useState<string>("1");
   const [inputUrl, setInputUrl] = useState(initialUrl);
+  const [isEditingInput, setIsEditingInput] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isElectron, setIsElectron] = useState(false);
   const [fallbackMode, setFallbackMode] = useState(false);
   const [noTabs, setNoTabs] = useState(false);
+  
+  // Blocking state
+  const [blockedSites, setBlockedSites] = useState<string[]>([]);
+  const [isBlocked, setIsBlocked] = useState(false);
 
   /* -------------- IMPORTANT LINE -------------- */
   const actualSidebarWidth = sidebarWidth; // ← use whatever the parent sends
   /* -------------------------------------------- */
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+
+  // Fetch blocked sites on mount
+  useEffect(() => {
+    async function fetchBlockedSites() {
+      try {
+        const sites = await getBlockedWebsites();
+        setBlockedSites(sites.map(site => site.url));
+      } catch (error) {
+        console.error("Failed to fetch blocked websites:", error);
+      }
+    }
+    
+    fetchBlockedSites();
+  }, []);
+
+  // Check if current URL is blocked
+  useEffect(() => {
+    if (!activeTab || blockedSites.length === 0) return;
+    
+    try {
+      const currentUrl = new URL(activeTab.url);
+      const currentHost = currentUrl.hostname;
+      
+      // Check if any blocked site matches the current host
+      const isCurrentSiteBlocked = blockedSites.some(site => {
+        try {
+          const blockedUrl = new URL(site.startsWith('http') ? site : `https://${site}`);
+          return blockedUrl.hostname === currentHost;
+        } catch (e) {
+          // If URL parsing fails, try a simple includes check
+          return currentHost.includes(site) || site.includes(currentHost);
+        }
+      });
+      
+      if (isCurrentSiteBlocked) {
+        // Block site by showing block screen
+        setIsBlocked(true);
+        // Remove all tabs when blocked
+        if (isElectron && !fallbackMode) {
+          window.electronAPI?.removeBrowserView();
+        }
+      }
+    } catch (error) {
+      console.error("Error checking blocked status:", error);
+    }
+  }, [activeTab?.url, blockedSites, isElectron, fallbackMode]);
 
   /* ---------- environment checks ---------- */
   useEffect(() => {
@@ -85,17 +139,17 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
 
   /* ---------- tabs existence ---------- */
   useEffect(() => {
-    if (tabs.length === 0) {
+    if (tabs.length === 0 && !isBlocked) {
       setNoTabs(true);
       if (isElectron && !fallbackMode) window.electronAPI?.removeBrowserView();
     } else {
       setNoTabs(false);
     }
-  }, [tabs.length, isElectron, fallbackMode]);
+  }, [tabs.length, isBlocked, isElectron, fallbackMode]);
 
   /* ---------- electron listeners ---------- */
   useEffect(() => {
-    if (!isElectron || fallbackMode || noTabs) return;
+    if (!isElectron || fallbackMode || noTabs || isBlocked) return;
 
     window.electronAPI?.onBrowserViewCreated((id) =>
       console.log("BrowserView ID:", id)
@@ -105,7 +159,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
       setTabs((prev) =>
         prev.map((t) => (t.id === activeTabId ? { ...t, url } : t))
       );
-      setInputUrl(url);
+      if (!isEditingInput) setInputUrl(url);
     });
 
     window.electronAPI?.onNavigationState((state) => {
@@ -117,7 +171,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
           t.id === activeTabId ? { ...t, url: state.currentUrl } : t
         )
       );
-      setInputUrl(state.currentUrl);
+      if (!isEditingInput) setInputUrl(state.currentUrl);
     });
 
     window.electronAPI?.onPageTitleUpdated((title) => {
@@ -145,20 +199,20 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
       window.electronAPI?.removeAllListeners();
       if (!noTabs) window.electronAPI?.removeBrowserView();
     };
-  }, [activeTabId, actualSidebarWidth, isElectron, noTabs, isDarkMode]);
+  }, [activeTabId, actualSidebarWidth, isElectron, noTabs, isDarkMode, isEditingInput, isBlocked]);
 
   /* ---------- update bounds whenever width changes ---------- */
   useEffect(() => {
-    if (!isElectron || fallbackMode || noTabs) return;
+    if (!isElectron || fallbackMode || noTabs || isBlocked) return;
     window.electronAPI?.updateBrowserViewBounds(actualSidebarWidth);
-  }, [actualSidebarWidth, isElectron, noTabs]);
+  }, [actualSidebarWidth, isElectron, noTabs, isBlocked]);
 
   /* ---------- apply color‑scheme change ---------- */
   useEffect(() => {
-    if (isElectron && !fallbackMode && !noTabs)
+    if (isElectron && !fallbackMode && !noTabs && !isBlocked)
       window.electronAPI?.setColorScheme(isDarkMode ? "dark" : "light");
-    if (fallbackMode && !noTabs) setTabs((prev) => [...prev]);
-  }, [isDarkMode, isElectron, fallbackMode, noTabs]);
+    if (fallbackMode && !noTabs && !isBlocked) setTabs((prev) => [...prev]);
+  }, [isDarkMode, isElectron, fallbackMode, noTabs, isBlocked]);
 
   /* ---------- navigation handlers ---------- */
   const urlSubmit = (e: React.FormEvent) => {
@@ -168,24 +222,29 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
     setTabs((prev) =>
       prev.map((t) => (t.id === activeTabId ? { ...t, url } : t))
     );
-    if (isElectron && !fallbackMode && !noTabs)
+    if (isElectron && !fallbackMode && !noTabs && !isBlocked)
       window.electronAPI?.browserNavigate(url);
   };
+  
   const goBack = () =>
-    isElectron && !fallbackMode && !noTabs
+    isElectron && !fallbackMode && !noTabs && !isBlocked
       ? window.electronAPI?.browserGoBack()
       : null;
+      
   const goForward = () =>
-    isElectron && !fallbackMode && !noTabs
+    isElectron && !fallbackMode && !noTabs && !isBlocked
       ? window.electronAPI?.browserGoForward()
       : null;
+      
   const reload = () =>
-    isElectron && !fallbackMode && !noTabs
+    isElectron && !fallbackMode && !noTabs && !isBlocked
       ? window.electronAPI?.browserReload()
       : null;
 
   /* ---------- tab helpers ---------- */
   const addNewTab = () => {
+    // Reset block state when adding a new tab
+    setIsBlocked(false);
     const id = Date.now().toString();
     const newTab = { id, url: "https://www.google.com", title: "New Tab" };
     setTabs([...tabs, newTab]);
@@ -194,6 +253,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
     if (isElectron && !fallbackMode)
       window.electronAPI?.browserNavigate(newTab.url);
   };
+  
   const closeTab = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const idx = tabs.findIndex((t) => t.id === id);
@@ -209,11 +269,12 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
     }
     setTabs(tabs.filter((t) => t.id !== id));
   };
+  
   const switchTab = (id: string) => {
     if (id === activeTabId) return;
     setActiveTabId(id);
     const t = tabs.find((x) => x.id === id);
-    if (t && isElectron && !fallbackMode)
+    if (t && isElectron && !fallbackMode && !isBlocked)
       window.electronAPI?.browserNavigate(t.url);
   };
 
@@ -224,6 +285,29 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
       return "New Tab";
     }
   };
+
+  // Render blocked screen
+  if (isBlocked) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#F7F5EF]">
+        <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
+          <NoSymbolIcon className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            This Site is Blocked
+          </h2>
+          <p className="text-gray-600 mb-6">
+            This website has been blocked in your focus settings.
+          </p>
+          <button
+            onClick={addNewTab}
+            className="px-6 py-3 bg-[#1B3B29] text-white rounded-lg shadow hover:bg-[#152b1f] transition-colors flex items-center mx-auto"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" /> Open New Tab
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   /* ---------- render ---------- */
   return (
@@ -302,6 +386,8 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
             type="text"
             value={inputUrl}
             onChange={(e) => setInputUrl(e.target.value)}
+            onFocus={() => setIsEditingInput(true)}
+            onBlur={() => setIsEditingInput(false)}
             onKeyDown={(e) => {
               if (e.key === "Backspace" || e.key === "Delete")
                 e.stopPropagation();
