@@ -1,4 +1,4 @@
-import { supabase } from './tasksSupabase' 
+import { supabase } from './supabaseClient'
 
 export interface CalendarEvent {
   id: string;
