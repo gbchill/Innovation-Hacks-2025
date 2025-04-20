@@ -4,8 +4,8 @@ import {
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
-  CalendarEvent,           // ← the interface you exported in api layer
-} from '../services/calendarSupabase'   //     // adjust the path if it lives elsewhere
+  CalendarEvent,
+} from '../services/calendarSupabase'
 
 /* ────────────────────────────────────────
    Front‑end shape (camelCase)
@@ -117,7 +117,7 @@ export default function Calendar() {
     return () => { mounted = false }
   }, [weekIndex])
 
-  /* -------------------------- “Now” red line position ------------------------ */
+  /* -------------------------- "Now" red line position ------------------------ */
   const [nowPos, setNowPos] = useState(0)
   useEffect(() => {
     const updateNow = () => {
@@ -336,23 +336,23 @@ export default function Calendar() {
     children: React.ReactNode
     title: string
   }) => (
-    <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+    <div className="bg-[#242424] rounded-xl shadow-xl w-full max-w-md text-white">
       <div className="p-6">
-        <h2 className="text-2xl font-bold text-[#1B3B29] mb-6">{title}</h2>
+        <h2 className="text-2xl font-bold text-white mb-6">{title}</h2>
         {children}
       </div>
     </div>
   )
 
   return (
-    <div className="bg-[#F7F5EF] min-h-screen p-4 md:p-8">
+    <div className="bg-[#181414] min-h-screen p-4 md:p-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
         <div className="mb-4 md:mb-0">
-          <h1 className="text-3xl md:text-4xl font-bold text-[#1B3B29] mb-1">
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-1">
             Weekly Calendar
           </h1>
-          <p className="text-md text-[#5F6368]">
+          <p className="text-md text-gray-300">
             {currentDate.toLocaleDateString('en-US', {
               month: 'long',
               year: 'numeric',
@@ -363,20 +363,20 @@ export default function Calendar() {
           <button
             onClick={() => setWeekIndex(w => Math.max(0, w - 1))}
             disabled={weekIndex === 0}
-            className="px-4 py-2 bg-white text-[#1B3B29] border rounded-lg disabled:opacity-50"
+            className="px-4 py-2 bg-[#242424] text-white border border-gray-700 rounded-lg disabled:opacity-50"
           >
             ← Previous
           </button>
           <button
             onClick={() => setWeekIndex(0)}
-            className="px-4 py-2 bg-white text-[#1B3B29] border rounded-lg"
+            className="px-4 py-2 bg-[#242424] text-white border border-gray-700 rounded-lg"
           >
             Today
           </button>
           <button
             onClick={() => setWeekIndex(w => Math.min(weeks.length - 1, w + 1))}
             disabled={weekIndex === weeks.length - 1}
-            className="px-4 py-2 bg-white text-[#1B3B29] border rounded-lg disabled:opacity-50"
+            className="px-4 py-2 bg-[#242424] text-white border border-gray-700 rounded-lg disabled:opacity-50"
           >
             Next →
           </button>
@@ -385,23 +385,23 @@ export default function Calendar() {
 
       {/* Calendar Grid */}
       <div
-        className="border rounded-lg overflow-hidden shadow-sm bg-[#F7F5EF] relative"
+        className="border border-gray-700 rounded-lg overflow-hidden shadow-sm bg-[#181414] relative"
         ref={calendarRef}
       >
         {/* Header Row */}
-        <div className="grid grid-cols-8 bg-[#FAFAFA]">
-          <div className="border-r border-b border-[#E0E0E0]" />
+        <div className="grid grid-cols-8 bg-[#242424]">
+          <div className="border-r border-b border-gray-700" />
           {weeks[weekIndex].map((d, i) => (
             <div
               key={i}
-              className={`p-2 border-b border-[#E0E0E0] text-center ${
-                isToday(d.date) ? 'bg-[#E6F4EA]' : ''
+              className={`p-2 border-b border-gray-700 text-center ${
+                isToday(d.date) ? 'bg-[#1B3B29]' : ''
               }`}
             >
-              <div className="text-sm font-medium text-[#70757A]">{d.day}</div>
+              <div className="text-sm font-medium text-gray-300">{d.day}</div>
               <div
                 className={`mt-1 w-8 h-8 flex items-center justify-center mx-auto rounded-full ${
-                  isToday(d.date) ? 'bg-[#1B3B29] text-white' : 'text-[#3C4043]'
+                  isToday(d.date) ? 'bg-[#1B3B29] text-white' : 'text-white'
                 }`}
               >
                 {d.date}
@@ -417,10 +417,10 @@ export default function Calendar() {
             {timeSlots.map((slot, idx) => (
               <div
                 key={idx}
-                className="h-8 border-r border-[#E0E0E0] flex items-center justify-end pr-2 bg-[#F7F5EF]"
+                className="h-8 border-r border-gray-700 flex items-center justify-end pr-2 bg-[#181414]"
               >
                 {idx % 2 === 0 && (
-                  <span className="text-xs text-[#70757A]">{slot}</span>
+                  <span className="text-xs text-gray-400">{slot}</span>
                 )}
               </div>
             ))}
@@ -432,7 +432,7 @@ export default function Calendar() {
               {timeSlots.map((_, tIdx) => (
                 <div
                   key={tIdx}
-                  className="h-8 border-b border-[#E0E0E0] hover:bg-[#EDECE8] cursor-pointer bg-[#F7F5EF]"
+                  className="h-8 border-b border-gray-700 hover:bg-[#242424] cursor-pointer bg-[#181414]"
                   onClick={() => handleTimeSlotClick(dayIdx, tIdx)}
                 />
               ))}
@@ -440,7 +440,7 @@ export default function Calendar() {
             </div>
           ))}
 
-          {/* “Now” line */}
+          {/* "Now" line */}
           {weekIndex === 0 && (
             <div
               className="absolute bg-red-500 h-[2px] z-10"
@@ -461,7 +461,7 @@ export default function Calendar() {
             <div className="space-y-4">
               {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Title
                 </label>
                 <input
@@ -470,9 +470,9 @@ export default function Calendar() {
                   disabled={newEvent.isDeepWork}
                   className={`w-full p-2 border rounded-lg focus:ring-2 ${
                     newEvent.isDeepWork
-                      ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
-                      : 'focus:ring-[#1B3B29]'
-                  }`}
+                      ? 'bg-gray-700 border-gray-700 cursor-not-allowed'
+                      : 'bg-[#242424] border-gray-700 focus:ring-[#1B3B29]'
+                  } text-white`}
                   value={newEvent.title}
                   onChange={e => setNewEvent(ne => ({ ...ne, title: e.target.value }))}
                 />
@@ -480,11 +480,11 @@ export default function Calendar() {
               {/* Start & End */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Start Time
                   </label>
                   <select
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-700 rounded-lg bg-[#242424] text-white"
                     value={newEvent.startTime}
                     onChange={e => handleTimeChange(e.target.value, true, 'new')}
                   >
@@ -494,11 +494,11 @@ export default function Calendar() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     End Time
                   </label>
                   <select
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-700 rounded-lg bg-[#242424] text-white"
                     value={newEvent.endTime}
                     onChange={e => handleTimeChange(e.target.value, false, 'new')}
                   >
@@ -516,14 +516,14 @@ export default function Calendar() {
               </div>
               {/* Color */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Event Color
                 </label>
                 <input
                   type="color"
                   value={newEvent.color}
                   onChange={e => setNewEvent(ne => ({ ...ne, color: e.target.value }))}
-                  className="w-12 h-8 p-0 border-0"
+                  className="w-12 h-8 p-0 border-0 bg-transparent"
                 />
               </div>
               {/* Deep Work */}
@@ -532,20 +532,20 @@ export default function Calendar() {
                   type="checkbox"
                   checked={newEvent.isDeepWork}
                   onChange={e => setNewEvent(ne => ({ ...ne, isDeepWork: e.target.checked }))}
-                  className="h-4 w-4 text-[#FF7043] rounded"
+                  className="h-4 w-4 text-[#FF7043] rounded bg-[#242424]"
                 />
-                <span className="text-sm">Deep Work?</span>
+                <span className="text-sm text-gray-300">Deep Work?</span>
               </label>
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4">
                 <button
-                  className="px-4 py-2 border rounded-lg text-[#5F6368]"
+                  className="px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-[#1a1a1a]"
                   onClick={() => setIsEditing(false)}
                 >
                   Cancel
                 </button>
                 <button
-                  className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg"
+                  className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg hover:bg-[#152b1f]"
                   onClick={handleCreateEvent}
                 >
                   Create Event
@@ -563,7 +563,7 @@ export default function Calendar() {
             <div className="space-y-4">
               {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Title
                 </label>
                 <input
@@ -572,9 +572,9 @@ export default function Calendar() {
                   disabled={!!selectedEvent.isDeepWork}
                   className={`w-full p-2 border rounded-lg focus:ring-2 ${
                     selectedEvent.isDeepWork
-                      ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
-                      : 'focus:ring-[#1B3B29]'
-                  }`}
+                      ? 'bg-gray-700 border-gray-700 cursor-not-allowed'
+                      : 'bg-[#242424] border-gray-700 focus:ring-[#1B3B29]'
+                  } text-white`}
                   value={selectedEvent.title}
                   onChange={e => setSelectedEvent(se => se && ({ ...se, title: e.target.value }))}
                 />
@@ -582,11 +582,11 @@ export default function Calendar() {
               {/* Start & End */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Start Time
                   </label>
                   <select
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-700 rounded-lg bg-[#242424] text-white"
                     value={selectedEvent.startTime}
                     onChange={e => handleTimeChange(e.target.value, true, 'existing')}
                   >
@@ -594,11 +594,11 @@ export default function Calendar() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     End Time
                   </label>
                   <select
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-700 rounded-lg bg-[#242424] text-white"
                     value={selectedEvent.endTime}
                     onChange={e => handleTimeChange(e.target.value, false, 'existing')}
                   >
@@ -616,14 +616,14 @@ export default function Calendar() {
               </div>
               {/* Color */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Event Color
                 </label>
                 <input
                   type="color"
                   value={selectedEvent.color}
                   onChange={e => setSelectedEvent(se => se && ({ ...se, color: e.target.value }))}
-                  className="w-12 h-8 p-0 border-0"
+                  className="w-12 h-8 p-0 border-0 bg-transparent"
                 />
               </div>
               {/* Deep Work */}
@@ -632,27 +632,27 @@ export default function Calendar() {
                   type="checkbox"
                   checked={!!selectedEvent.isDeepWork}
                   onChange={e => setSelectedEvent(se => se && ({ ...se, isDeepWork: e.target.checked }))}
-                  className="h-4 w-4 text-[#FF7043] rounded"
+                  className="h-4 w-4 text-[#FF7043] rounded bg-[#242424]"
                 />
-                <span className="text-sm">Deep Work?</span>
+                <span className="text-sm text-gray-300">Deep Work?</span>
               </label>
               {/* Actions */}
               <div className="flex justify-between pt-4">
                 <button
-                  className="px-4 py-2 text-red-600 border rounded-lg"
+                  className="px-4 py-2 text-red-500 border border-gray-700 rounded-lg hover:bg-[#2a2020]"
                   onClick={handleDeleteEvent}
                 >
                   Delete
                 </button>
                 <div className="flex gap-3">
                   <button
-                    className="px-4 py-2 border rounded-lg text-[#5F6368]"
+                    className="px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-[#1a1a1a]"
                     onClick={() => setSelectedEvent(null)}
                   >
                     Cancel
                   </button>
                   <button
-                    className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg"
+                    className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg hover:bg-[#152b1f]"
                     onClick={handleUpdateEvent}
                   >
                     Save Changes

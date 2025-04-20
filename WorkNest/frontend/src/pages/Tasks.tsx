@@ -367,21 +367,21 @@ const InteractiveTodo: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center h-full">Loading tasks...</div>;
+    return <div className="flex justify-center items-center h-full text-white">Loading tasks...</div>;
   }
 
   return (
-    <div className="p-4 bg-[#f9f9f7] min-h-screen">
+    <div className="p-4 bg-[#181414] min-h-screen">
       {/* Add new */}
       <div className="flex gap-2 max-w-xl mx-auto mb-4">
         <input
-          className="flex-1 border px-4 py-2 rounded"
+          className="flex-1 border border-gray-700 bg-[#242424] text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
           placeholder="New task..."
           value={newTask}
           onChange={e => setNewTask(e.target.value)}
         />
         <select
-          className="border px-3 py-2 rounded"
+          className="border border-gray-700 bg-[#242424] text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
           value={targetColumn}
           onChange={e => setTargetColumn(e.target.value as any)}
         >
@@ -389,7 +389,10 @@ const InteractiveTodo: React.FC = () => {
           <option value="doing">Medium ⚠️</option>
           <option value="done">Low ✅</option>
         </select>
-        <button onClick={handleAddTask} className="bg-[#1B3B29] text-white px-6 py-2 rounded">
+        <button 
+          onClick={handleAddTask} 
+          className="bg-[#1B3B29] text-white px-6 py-2 rounded hover:bg-[#152b1f]"
+        >
           Add
         </button>
       </div>
@@ -403,9 +406,9 @@ const InteractiveTodo: React.FC = () => {
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="bg-white border rounded p-4 w-64 flex-shrink-0"
+                  className="bg-[#242424] border border-gray-700 rounded p-4 w-64 flex-shrink-0"
                 >
-                  <h3 className="text-center font-bold mb-3">{col.title}</h3>
+                  <h3 className="text-center font-bold mb-3 text-white">{col.title}</h3>
                   {col.tasks.map((t, i) => (
                     <Draggable key={t.id} draggableId={t.id} index={i}>
                       {prov => (
@@ -413,10 +416,10 @@ const InteractiveTodo: React.FC = () => {
                           ref={prov.innerRef}
                           {...prov.draggableProps}
                           {...prov.dragHandleProps}
-                          className="p-3 mb-2 bg-gray-100 rounded flex justify-between items-center cursor-pointer"
+                          className="p-3 mb-2 bg-[#333333] rounded flex justify-between items-center cursor-pointer hover:bg-[#3a3a3a]"
                           onDoubleClick={() => openEditModal(t, colId)}
                         >
-                          <span>{t.content}</span>
+                          <span className="text-white">{t.content}</span>
                           <div className="flex gap-2">
                             {colId !== 'completed' && (
                               <button
@@ -448,15 +451,15 @@ const InteractiveTodo: React.FC = () => {
       {/* Edit Modal with blur backdrop */}
       {modalTask && (
         <div className="fixed inset-0 backdrop-filter backdrop-blur-lg flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-80 shadow-lg">
+          <div className="bg-[#242424] p-6 rounded-lg w-80 shadow-lg text-white border border-gray-700">
             <h4 className="mb-3 font-semibold">Edit Task</h4>
             <input
-              className="w-full border p-2 rounded mb-3"
+              className="w-full border border-gray-700 bg-[#333333] p-2 rounded mb-3 text-white focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
               value={modalName}
               onChange={e => setModalName(e.target.value)}
             />
             <select
-              className="w-full border p-2 rounded mb-4"
+              className="w-full border border-gray-700 bg-[#333333] p-2 rounded mb-4 text-white focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
               value={modalPriority}
               onChange={e => setModalPriority(e.target.value as any)}
             >
@@ -464,10 +467,16 @@ const InteractiveTodo: React.FC = () => {
               <option value="doing">Medium ⚠️</option>
               <option value="done">Low ✅</option>
             </select>
-            <button onClick={handleSave} className="w-full bg-[#1B3B29] text-white py-2 rounded mb-2">
+            <button 
+              onClick={handleSave} 
+              className="w-full bg-[#1B3B29] text-white py-2 rounded mb-2 hover:bg-[#152b1f]"
+            >
               Save
             </button>
-            <button onClick={closeModal} className="w-full border py-2 rounded">
+            <button 
+              onClick={closeModal} 
+              className="w-full border border-gray-700 text-white py-2 rounded hover:bg-[#333333]"
+            >
               Cancel
             </button>
           </div>
