@@ -1,5 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase } from '../services/tasksSupabase';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 // Create a context for Supabase

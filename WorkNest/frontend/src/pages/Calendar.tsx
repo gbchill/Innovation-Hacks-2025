@@ -1,6 +1,15 @@
-// src/pages/Calendar.tsx
 import React, { useState, useEffect, useRef } from 'react'
+import {
+  getCalendarEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+  CalendarEvent,           // ← the interface you exported in api layer
+} from '../services/calendarSupabase'   //     // adjust the path if it lives elsewhere
 
+/* ────────────────────────────────────────
+   Front‑end shape (camelCase)
+   ──────────────────────────────────────── */
 interface Event {
   id: string
   title: string
@@ -11,7 +20,32 @@ interface Event {
   isDeepWork?: boolean
 }
 
+/* Helper to translate DB ↔ front‑end -------------------------- */
+const dbToEvent = (db: CalendarEvent): Event => ({
+  id: db.id,
+  title: db.title,
+  dayIndex: db.day_index,
+  startTime: db.start_time,
+  endTime: db.end_time,
+  color: db.color,
+  isDeepWork: db.is_deep_work ?? false,
+})
+
+const eventToDb = (
+  ev: Event,
+  weekIndex: number,
+): Omit<CalendarEvent, 'id' | 'created_at'> => ({
+  title: ev.title,
+  day_index: ev.dayIndex,
+  start_time: ev.startTime,
+  end_time: ev.endTime,
+  color: ev.color,
+  is_deep_work: ev.isDeepWork ?? false,
+  week_index: weekIndex,
+})
+
 export default function Calendar() {
+  /* ------------------------- static calendar scaffold ------------------------ */
   const weeks = [
     [
       { date: 14, day: 'Sun' }, { date: 15, day: 'Mon' }, { date: 16, day: 'Tue' },
@@ -45,6 +79,7 @@ export default function Calendar() {
   const timeSlots = generateTimeSlots()
   const slotHeight = 32
 
+  /* ----------------------------- component state ----------------------------- */
   const [weekIndex, setWeekIndex] = useState(0)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<Event[]>([])
@@ -68,7 +103,21 @@ export default function Calendar() {
 
   const calendarRef = useRef<HTMLDivElement>(null)
 
-  // “Now” line
+  /* -------------------------- fetch events for the week ---------------------- */
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const dbEvents = await getCalendarEvents(weekIndex /*, userId */)
+        if (mounted) setEvents(dbEvents.map(dbToEvent))
+      } catch (err) {
+        console.error('Failed to load calendar events', err)
+      }
+    })()
+    return () => { mounted = false }
+  }, [weekIndex])
+
+  /* -------------------------- “Now” red line position ------------------------ */
   const [nowPos, setNowPos] = useState(0)
   useEffect(() => {
     const updateNow = () => {
@@ -81,9 +130,9 @@ export default function Calendar() {
     return () => clearInterval(id)
   }, [])
 
-  // DeepWork event listener
+  /* --------------------------- deep‑work event hook -------------------------- */
   useEffect(() => {
-    const handler = (e: CustomEvent<{ start: Date; end: Date }>) => {
+    const handler = async (e: CustomEvent<{ start: Date; end: Date }>) => {
       const { start, end } = e.detail
       const col = weeks[weekIndex].findIndex(d => d.date === start.getDate())
       const fmt = (d: Date) => {
@@ -94,31 +143,41 @@ export default function Calendar() {
         if (h === 0) h = 12
         return `${h}:${m} ${pm ? 'PM' : 'AM'}`
       }
-      setEvents(evts => [
-        ...evts,
-        {
-          id: Date.now().toString(),
-          title: 'Deep Work',
-          dayIndex: col >= 0 ? col : 0,
-          startTime: fmt(start),
-          endTime: fmt(end),
-          color: '#FF7043',
-          isDeepWork: true,
-        },
-      ])
+
+      /* save in DB then local state */
+      try {
+        const saved = await createCalendarEvent({
+          ...eventToDb(
+            {
+              id: '',
+              title: 'Deep Work',
+              dayIndex: col >= 0 ? col : 0,
+              startTime: fmt(start),
+              endTime: fmt(end),
+              color: '#FF7043',
+              isDeepWork: true,
+            },
+            weekIndex,
+          ),
+        })
+        setEvents(evts => [...evts, dbToEvent(saved)])
+      } catch (err) {
+        console.error('Failed to create Deep Work event', err)
+      }
     }
+
     window.addEventListener('deepworkEvent', handler as any)
     return () => window.removeEventListener('deepworkEvent', handler as any)
   }, [weekIndex])
 
-  // Update current date when week changes
+  /* --------------- update current date label when week changes -------------- */
   useEffect(() => {
     const d = new Date()
     d.setDate(d.getDate() + weekIndex * 7)
     setCurrentDate(d)
   }, [weekIndex])
 
-  // Helpers
+  /* ------------------------------- helpers ---------------------------------- */
   const isToday = (date: number) => {
     const t = new Date()
     return (
@@ -127,6 +186,7 @@ export default function Calendar() {
       currentDate.getFullYear() === t.getFullYear()
     )
   }
+
   const timeToPosition = (time: string) => {
     const [tp, period] = time.split(' ')
     let [h, m] = tp.split(':').map(Number)
@@ -134,7 +194,7 @@ export default function Calendar() {
     return ((h * 60 + m) / 30) * slotHeight
   }
 
-  // Create / edit handlers
+  /* --------------------------- CRUD handlers -------------------------------- */
   const handleTimeSlotClick = (dayIndex: number, timeIdx: number) => {
     const start = timeSlots[timeIdx]
     const end = timeSlots[Math.min(timeIdx + 2, timeSlots.length - 1)]
@@ -149,37 +209,69 @@ export default function Calendar() {
     setIsEditing(true)
   }
 
-  const handleCreateEvent = () => {
+  const handleCreateEvent = async () => {
     const title = newEvent.isDeepWork ? 'Deep Work' : newEvent.title.trim()
     if (!title) return
     const color = newEvent.isDeepWork ? '#FF7043' : newEvent.color
-    setEvents(evts => [
-      ...evts,
-      { id: Date.now().toString(), ...newEvent, title, color },
-    ])
-    setIsEditing(false)
+
+    try {
+      const saved = await createCalendarEvent(
+        eventToDb(
+          {
+            id: '',
+            title,
+            dayIndex: newEvent.dayIndex,
+            startTime: newEvent.startTime,
+            endTime: newEvent.endTime,
+            color,
+            isDeepWork: newEvent.isDeepWork,
+          },
+          weekIndex,
+        ),
+      )
+      setEvents(evts => [...evts, dbToEvent(saved)])
+      setIsEditing(false)
+    } catch (err) {
+      console.error('Error creating calendar event', err)
+    }
+  }
+
+  const handleUpdateEvent = async () => {
+    if (!selectedEvent) return
+    try {
+      const updated = await updateCalendarEvent(
+        selectedEvent.id,
+        eventToDb(selectedEvent, weekIndex),
+      )
+      setEvents(evts =>
+        evts.map(ev => (ev.id === updated.id ? dbToEvent(updated) : ev)),
+      )
+      setSelectedEvent(null)
+    } catch (err) {
+      console.error('Error updating calendar event', err)
+    }
+  }
+
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent) return
+    try {
+      await deleteCalendarEvent(selectedEvent.id)
+      setEvents(evts => evts.filter(ev => ev.id !== selectedEvent.id))
+      setSelectedEvent(null)
+    } catch (err) {
+      console.error('Error deleting event', err)
+    }
   }
 
   const handleEventClick = (ev: Event, e: React.MouseEvent) => {
     e.stopPropagation()
     setSelectedEvent(ev)
   }
-  const handleUpdateEvent = () => {
-    if (!selectedEvent) return
-    setEvents(evts =>
-      evts.map(ev => (ev.id === selectedEvent.id ? selectedEvent : ev))
-    )
-    setSelectedEvent(null)
-  }
-  const handleDeleteEvent = () => {
-    if (!selectedEvent) return
-    setEvents(evts => evts.filter(ev => ev.id !== selectedEvent.id))
-    setSelectedEvent(null)
-  }
+
   const handleTimeChange = (
     time: string,
     isStart: boolean,
-    type: 'new' | 'existing'
+    type: 'new' | 'existing',
   ) => {
     if (type === 'new') {
       setNewEvent(ne => ({
@@ -194,6 +286,7 @@ export default function Calendar() {
     }
   }
 
+  /* ---------------------- renderer helpers (unchanged) ---------------------- */
   const renderEvents = (dayIdx: number) =>
     events
       .filter(ev => ev.dayIndex === dayIdx)

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { supabase } from '../services/supabase';
+import { supabase } from '../services/tasksSupabase';
 
 type Task = { 
   id: string; 
