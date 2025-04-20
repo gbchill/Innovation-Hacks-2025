@@ -125,7 +125,7 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
             onClick={handleStart}
             className="w-full py-2 rounded-lg bg-[#1B3B29] text-white hover:bg-opacity-90 transition-all flex items-center justify-center"
           >
-            <ClockIcon className="w-5 h-5 mr-2" />
+            <ClockIcon className="w-5 h-5 ml-3" />
             Start Focus Timer
           </button>
         </div>

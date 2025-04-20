@@ -92,10 +92,10 @@ function Sidebar({
             <div className="flex items-center gap-2">
               <img
                 src={Logo}
-                className="w-8 h-8 rounded-full shadow-sm"
+                className="w-10 h-10 rounded-full shadow-sm"
                 alt="WorkNest Logo"
               />
-              <h2 className="text-lg font-bold text-white">WorkNest</h2>
+              <h2 className="text-lg pr-5 font-bold text-white">WorkNest</h2>
             </div>
           )}
         </div>
