@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+// src/App.tsx
+import React, { useState } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+} from "react-router-dom";
 
 import Sidebar from "./components/layout/Sidebar";
 import WelcomeScreen from "./components/common/WelcomeScreen";
@@ -14,7 +19,7 @@ function App() {
   const [started, setStarted] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
-  const sidebarWidth = 256; // 16rem or 256px for w-64
+  const sidebarWidth = 256; // w-64
 
   if (!started) {
     return <WelcomeScreen onGetStarted={() => setStarted(true)} />;
@@ -31,23 +36,45 @@ function App() {
 
       <div className="flex h-screen w-screen overflow-hidden bg-[#F7F5EF] relative z-10">
         {/* Sidebar */}
-        <div className="z-20 h-full" style={{ width: sidebarCollapsed ? '0' : `${sidebarWidth}px` }}>
+        <div
+          className="z-20 h-full overflow-hidden transition-all duration-300"
+          style={{
+            width: sidebarCollapsed ? "0px" : `${sidebarWidth}px`,
+          }}
+        >
           <Sidebar onToggle={handleSidebarToggle} />
         </div>
 
-        {/* Main content area */}
+        {/* Main content */}
         <div className="flex-1 overflow-hidden relative">
-          {/* Top-right floating Focus Timer */}
+          {/* Top‑right floating Focus Timer */}
           <div className="absolute top-4 right-4 z-30">
             <FocusTimer onTimerRunning={setTimerActive} />
           </div>
 
-          {/* Routes */}
+          {/* App routes */}
           <Routes>
-            <Route path="/" element={<BrowserPage sidebarWidth={sidebarWidth} sidebarCollapsed={sidebarCollapsed} />} />
+            <Route
+              path="/"
+              element={
+                <BrowserPage
+                  sidebarWidth={sidebarWidth}
+                  sidebarCollapsed={sidebarCollapsed}
+                />
+              }
+            />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/tasks" element={<Tasks />} />
-            <Route path="/deepwork" element={<DeepWork />} />
+            <Route
+              path="/deepwork"
+              element={
+                <DeepWork
+                  onScheduleDeepWork={(start, end) =>
+                    console.log("Scheduled Deep Work:", start, end)
+                  }
+                />
+              }
+            />
           </Routes>
         </div>
       </div>
