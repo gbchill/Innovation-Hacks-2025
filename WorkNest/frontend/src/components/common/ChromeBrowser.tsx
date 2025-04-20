@@ -143,25 +143,25 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex items-center p-2 bg-gray-100 border-b">
+      <div className="flex items-center p-2 bg-[#F7F5EF] border-b">
         <button 
           onClick={goBack} 
           disabled={!canGoBack || fallbackMode}
-          className={`p-2 rounded ${(!fallbackMode && canGoBack) ? 'text-gray-700 hover:bg-gray-200' : 'text-gray-400'}`}
+          className={`p-2 rounded ${(!fallbackMode && canGoBack) ? 'text-gray-700 hover:bg-[#F7F5EF]' : 'text-gray-400'}`}
         >
           ←
         </button>
         <button 
           onClick={goForward} 
           disabled={!canGoForward || fallbackMode}
-          className={`p-2 rounded ${(!fallbackMode && canGoForward) ? 'text-gray-700 hover:bg-gray-200' : 'text-gray-400'}`}
+          className={`p-2 rounded ${(!fallbackMode && canGoForward) ? 'text-gray-700 hover:bg-[#F7F5EF]' : 'text-gray-400'}`}
         >
           →
         </button>
         <button 
           onClick={reload} 
           disabled={fallbackMode}
-          className={`p-2 rounded ${!fallbackMode ? 'text-gray-700 hover:bg-gray-200' : 'text-gray-400'}`}
+          className={`p-2 rounded ${!fallbackMode ? 'text-gray-700 hover:bg-[#F7F5EF]' : 'text-gray-400'}`}
         >
           ↻
         </button>
@@ -175,13 +175,13 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
           />
         </form>
         {isLoading && !fallbackMode && (
-          <div className="ml-2 text-blue-500">Loading...</div>
+          <div className="ml-2 text-green-200">Loading...</div>
         )}
       </div>
       
       {/* If in fallback mode, show an iframe instead */}
       {fallbackMode ? (
-        <div className="flex-1 bg-white">
+        <div className="flex-1 bg-[#F7F5EF]">
           <iframe 
             src={url} 
             className="w-full h-full border-0"
@@ -192,7 +192,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
       ) : (
         /* The actual browser content is rendered by Electron in the main process */
         /* This is just a placeholder to maintain the layout */
-        <div className="flex-1 bg-white" style={{ height: 'calc(100vh - 130px)' }}></div>
+        <div className="flex-1 bg-[#F7F5EF]" style={{ height: 'calc(100vh - 130px)' }}></div>
       )}
       
       {fallbackMode && (
