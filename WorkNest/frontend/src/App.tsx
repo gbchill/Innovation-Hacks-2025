@@ -1,11 +1,15 @@
-import { useState } from "react";
+// src/App.tsx
+import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
 import Sidebar from "./components/layout/Sidebar";
 import WelcomeScreen from "./components/common/WelcomeScreen";
 import BrowserPage from "./pages/BrowserPage";
 import Calendar from "./pages/Calendar";
 import Tasks from "./pages/Tasks";
 import DeepWork from "./pages/DeepWork";
+import FocusTimer from "./components/common/FocusTimer";
+import AnimatedLoop from "./components/common/AnimatedLoop";
 
 /* -------------  keep numbers in sync with Sidebar.tsx ------------- */
 const SIDEBAR_EXPANDED = 192; // w-56 (14rem)
@@ -15,10 +19,15 @@ function App() {
   const [started, setStarted] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [timerActive, setTimerActive] = useState(false);
 
-  const toggleColorScheme = () => setIsDarkMode((p) => !p);
+  const toggleColorScheme = () => setIsDarkMode((prev) => !prev);
+  const handleSidebarToggle = (collapsed: boolean) =>
+    setSidebarCollapsed(collapsed);
 
-  const sidebarWidth = sidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;
+  const sidebarWidth = sidebarCollapsed
+    ? SIDEBAR_COLLAPSED
+    : SIDEBAR_EXPANDED;
 
   if (!started) {
     return <WelcomeScreen onGetStarted={() => setStarted(true)} />;
@@ -26,14 +35,29 @@ function App() {
 
   return (
     <Router>
-      <div className="flex h-screen w-screen overflow-hidden">
-        <Sidebar
-          onToggle={setSidebarCollapsed}
-          isDarkMode={isDarkMode}
-          toggleColorScheme={toggleColorScheme}
-        />
+      {/* Background animation tied to focus timer */}
+      <AnimatedLoop show={timerActive} />
 
-        <div className="flex-1 h-full">
+      <div className="flex h-screen w-screen overflow-hidden bg-[#F7F5EF]">
+        {/* Sidebar */}
+        <div
+          className="z-20 h-full overflow-hidden transition-all duration-300"
+          style={{ width: sidebarWidth }}
+        >
+          <Sidebar
+            onToggle={handleSidebarToggle}
+            isDarkMode={isDarkMode}
+            toggleColorScheme={toggleColorScheme}
+          />
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 overflow-hidden relative">
+          {/* Top‑right floating Focus Timer */}
+          <div className="absolute top-4 right-4 z-30">
+            <FocusTimer onTimerRunning={setTimerActive} />
+          </div>
+
           <Routes>
             <Route
               path="/"
@@ -47,7 +71,16 @@ function App() {
             />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/tasks" element={<Tasks />} />
-            <Route path="/deepwork" element={<DeepWork />} />
+            <Route
+              path="/deepwork"
+              element={
+                <DeepWork
+                  onScheduleDeepWork={(start, end) =>
+                    console.log("Scheduled Deep Work:", start, end)
+                  }
+                />
+              }
+            />
           </Routes>
         </div>
       </div>

@@ -1,500 +1,566 @@
-import { useState, useEffect, useRef } from "react";
+// src/pages/Calendar.tsx
+import React, { useState, useEffect, useRef } from 'react'
 
 interface Event {
-  id: string;
-  title: string;
-  dayIndex: number;
-  startTime: string;
-  endTime: string;
-  color: string;
+  id: string
+  title: string
+  dayIndex: number
+  startTime: string
+  endTime: string
+  color: string
+  isDeepWork?: boolean
 }
 
-function Calendar() {
+export default function Calendar() {
   const weeks = [
     [
-      { date: 14, day: "Sun" },
-      { date: 15, day: "Mon" },
-      { date: 16, day: "Tue" },
-      { date: 17, day: "Wed" },
-      { date: 18, day: "Thu" },
-      { date: 19, day: "Fri" },
-      { date: 20, day: "Sat" },
+      { date: 14, day: 'Sun' }, { date: 15, day: 'Mon' }, { date: 16, day: 'Tue' },
+      { date: 17, day: 'Wed' }, { date: 18, day: 'Thu' }, { date: 19, day: 'Fri' },
+      { date: 20, day: 'Sat' },
     ],
     [
-      { date: 21, day: "Sun" },
-      { date: 22, day: "Mon" },
-      { date: 23, day: "Tue" },
-      { date: 24, day: "Wed" },
-      { date: 25, day: "Thu" },
-      { date: 26, day: "Fri" },
-      { date: 27, day: "Sat" },
+      { date: 21, day: 'Sun' }, { date: 22, day: 'Mon' }, { date: 23, day: 'Tue' },
+      { date: 24, day: 'Wed' }, { date: 25, day: 'Thu' }, { date: 26, day: 'Fri' },
+      { date: 27, day: 'Sat' },
     ],
     [
-      { date: 28, day: "Sun" },
-      { date: 29, day: "Mon" },
-      { date: 30, day: "Tue" },
-      { date: 1, day: "Wed" },
-      { date: 2, day: "Thu" },
-      { date: 3, day: "Fri" },
-      { date: 4, day: "Sat" },
+      { date: 28, day: 'Sun' }, { date: 29, day: 'Mon' }, { date: 30, day: 'Tue' },
+      { date: 1,  day: 'Wed' }, { date: 2,  day: 'Thu' }, { date: 3,  day: 'Fri' },
+      { date: 4,  day: 'Sat' },
     ],
-  ];
+  ]
 
-  // Generate time slots with 30-minute intervals and proper 12 AM formatting
   const generateTimeSlots = () => {
-    const slots = [];
+    const slots: string[] = []
     for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
-        const displayHour = hour % 12 || 12;
-        const period = hour < 12 ? "AM" : "PM";
-        const formattedMinute = minute.toString().padStart(2, '0');
-        slots.push(`${displayHour}:${formattedMinute} ${period}`);
+        const displayHour = hour % 12 || 12
+        const period = hour < 12 ? 'AM' : 'PM'
+        const formattedMinute = minute.toString().padStart(2, '0')
+        slots.push(`${displayHour}:${formattedMinute} ${period}`)
       }
     }
-    return slots;
-  };
+    return slots
+  }
+  const timeSlots = generateTimeSlots()
+  const slotHeight = 32
 
-  const timeSlots = generateTimeSlots();
-  const slotHeight = 32; // Each 30-minute slot is 32px tall
-
-  const [weekIndex, setWeekIndex] = useState(0);
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [events, setEvents] = useState<Event[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [newEvent, setNewEvent] = useState({
-    title: "",
+  const [weekIndex, setWeekIndex] = useState(0)
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [events, setEvents] = useState<Event[]>([])
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [newEvent, setNewEvent] = useState<{
+    title: string
+    dayIndex: number
+    startTime: string
+    endTime: string
+    color: string
+    isDeepWork: boolean
+  }>({
+    title: '',
     dayIndex: 0,
-    startTime: "9:00 AM",
-    endTime: "10:00 AM",
-    color: "#4285F4",
-  });
+    startTime: '9:00 AM',
+    endTime: '10:00 AM',
+    color: '#4285F4',
+    isDeepWork: false,
+  })
 
-  const eventColors = ["#4285F4", "#34A853", "#FBBC05", "#EA4335", "#673AB7"];
-  const calendarRef = useRef<HTMLDivElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null)
 
+  // “Now” line
+  const [nowPos, setNowPos] = useState(0)
   useEffect(() => {
-    const newDate = new Date();
-    newDate.setDate(newDate.getDate() + (weekIndex * 7));
-    setCurrentDate(newDate);
-  }, [weekIndex]);
+    const updateNow = () => {
+      const n = new Date()
+      const total = n.getHours() * 60 + n.getMinutes()
+      setNowPos((total / 30) * slotHeight)
+    }
+    updateNow()
+    const id = setInterval(updateNow, 60000)
+    return () => clearInterval(id)
+  }, [])
 
+  // DeepWork event listener
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ start: Date; end: Date }>) => {
+      const { start, end } = e.detail
+      const col = weeks[weekIndex].findIndex(d => d.date === start.getDate())
+      const fmt = (d: Date) => {
+        let h = d.getHours()
+        const m = d.getMinutes().toString().padStart(2, '0')
+        const pm = h >= 12
+        if (h > 12) h -= 12
+        if (h === 0) h = 12
+        return `${h}:${m} ${pm ? 'PM' : 'AM'}`
+      }
+      setEvents(evts => [
+        ...evts,
+        {
+          id: Date.now().toString(),
+          title: 'Deep Work',
+          dayIndex: col >= 0 ? col : 0,
+          startTime: fmt(start),
+          endTime: fmt(end),
+          color: '#FF7043',
+          isDeepWork: true,
+        },
+      ])
+    }
+    window.addEventListener('deepworkEvent', handler as any)
+    return () => window.removeEventListener('deepworkEvent', handler as any)
+  }, [weekIndex])
+
+  // Update current date when week changes
+  useEffect(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + weekIndex * 7)
+    setCurrentDate(d)
+  }, [weekIndex])
+
+  // Helpers
   const isToday = (date: number) => {
-    const today = new Date();
+    const t = new Date()
     return (
-      date === today.getDate() &&
-      currentDate.getMonth() === today.getMonth() &&
-      currentDate.getFullYear() === today.getFullYear()
-    );
-  };
-
-  // Convert time string to position in pixels
+      date === t.getDate() &&
+      currentDate.getMonth() === t.getMonth() &&
+      currentDate.getFullYear() === t.getFullYear()
+    )
+  }
   const timeToPosition = (time: string) => {
-    const [timePart, period] = time.split(" ");
-    const [hours, minutes] = timePart.split(":").map(Number);
-    let hour = hours;
-    if (period === "PM" && hour !== 12) hour += 12;
-    if (period === "AM" && hour === 12) hour = 0;
-    return (hour * 2 + (minutes / 30)) * slotHeight;
-  };
+    const [tp, period] = time.split(' ')
+    let [h, m] = tp.split(':').map(Number)
+    h = h % 12 + (period === 'PM' && h !== 12 ? 12 : 0)
+    return ((h * 60 + m) / 30) * slotHeight
+  }
 
-  const handleTimeSlotClick = (dayIndex: number, timeSlotIndex: number) => {
-    const startTime = timeSlots[timeSlotIndex];
-    const endTime = timeSlots[Math.min(timeSlotIndex + 2, timeSlots.length - 1)]; // Default 1 hour duration
-    
+  // Create / edit handlers
+  const handleTimeSlotClick = (dayIndex: number, timeIdx: number) => {
+    const start = timeSlots[timeIdx]
+    const end = timeSlots[Math.min(timeIdx + 2, timeSlots.length - 1)]
     setNewEvent({
-      title: "",
+      title: '',
       dayIndex,
-      startTime,
-      endTime,
-      color: eventColors[Math.floor(Math.random() * eventColors.length)],
-    });
-    setIsEditing(true);
-  };
+      startTime: start,
+      endTime: end,
+      color: '#4285F4',
+      isDeepWork: false,
+    })
+    setIsEditing(true)
+  }
 
   const handleCreateEvent = () => {
-    if (!newEvent.title.trim()) return;
-    
-    const event: Event = {
-      id: Date.now().toString(),
-      title: newEvent.title,
-      dayIndex: newEvent.dayIndex,
-      startTime: newEvent.startTime,
-      endTime: newEvent.endTime,
-      color: newEvent.color,
-    };
-    
-    setEvents([...events, event]);
-    setIsEditing(false);
-    setNewEvent({
-      title: "",
-      dayIndex: 0,
-      startTime: "9:00 AM",
-      endTime: "10:00 AM",
-      color: "#4285F4",
-    });
-  };
+    const title = newEvent.isDeepWork ? 'Deep Work' : newEvent.title.trim()
+    if (!title) return
+    const color = newEvent.isDeepWork ? '#FF7043' : newEvent.color
+    setEvents(evts => [
+      ...evts,
+      { id: Date.now().toString(), ...newEvent, title, color },
+    ])
+    setIsEditing(false)
+  }
 
-  const handleEventClick = (event: Event, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedEvent(event);
-  };
-
+  const handleEventClick = (ev: Event, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedEvent(ev)
+  }
   const handleUpdateEvent = () => {
-    if (!selectedEvent) return;
-    
-    setEvents(events.map(e => 
-      e.id === selectedEvent.id ? selectedEvent : e
-    ));
-    setSelectedEvent(null);
-  };
-
+    if (!selectedEvent) return
+    setEvents(evts =>
+      evts.map(ev => (ev.id === selectedEvent.id ? selectedEvent : ev))
+    )
+    setSelectedEvent(null)
+  }
   const handleDeleteEvent = () => {
-    if (!selectedEvent) return;
-    setEvents(events.filter(e => e.id !== selectedEvent.id));
-    setSelectedEvent(null);
-  };
-
-  const renderEvents = () =>
-    events.map(event => {
-      const top = timeToPosition(event.startTime) + 16;
-      const height = timeToPosition(event.endTime) - timeToPosition(event.startTime);
-      const minHeight = 64;
-  
-      return (
-        <div
-          key={event.id}
-          onClick={e => handleEventClick(event, e)}
-          className="absolute mx-3 rounded-xl p-3 text-white text-sm shadow-sm cursor-pointer overflow-hidden"
-          style={{
-            top: `${top}px`,
-            left: `0`,
-            width: '120px',
-            height: `${Math.max(height, minHeight)}px`,
-            backgroundColor: event.color,
-          }}
-        >
-          <div className="font-medium truncate">{event.title}</div>
-          <div className="text-xs opacity-90 truncate">
-            {event.startTime} – {event.endTime}
-          </div>
-        </div>
-      );
-    });
-  
-  const handleTimeChange = (time: string, isStartTime: boolean, eventType: 'new' | 'existing') => {
-    if (eventType === 'new') {
-      setNewEvent(prev => ({
-        ...prev,
-        [isStartTime ? "startTime" : "endTime"]: time
-      }));
+    if (!selectedEvent) return
+    setEvents(evts => evts.filter(ev => ev.id !== selectedEvent.id))
+    setSelectedEvent(null)
+  }
+  const handleTimeChange = (
+    time: string,
+    isStart: boolean,
+    type: 'new' | 'existing'
+  ) => {
+    if (type === 'new') {
+      setNewEvent(ne => ({
+        ...ne,
+        [isStart ? 'startTime' : 'endTime']: time,
+      }))
     } else if (selectedEvent) {
-      setSelectedEvent(prev => ({
-        ...prev!,
-        [isStartTime ? "startTime" : "endTime"]: time
-      }));
+      setSelectedEvent(se => ({
+        ...se!,
+        [isStart ? 'startTime' : 'endTime']: time,
+      }))
     }
-  };
-  const ModalOverlay = ({ children, onClose }: { children: React.ReactNode; onClose?: () => void }) => (
+  }
+
+  const renderEvents = (dayIdx: number) =>
+    events
+      .filter(ev => ev.dayIndex === dayIdx)
+      .map(event => {
+        const top = timeToPosition(event.startTime) + 16
+        const height =
+          timeToPosition(event.endTime) - timeToPosition(event.startTime)
+        return (
+          <div
+            key={event.id}
+            onClick={e => handleEventClick(event, e)}
+            className="absolute mx-3 rounded-xl p-3 text-white text-sm shadow-sm cursor-pointer overflow-hidden"
+            style={{
+              top: `${top}px`,
+              height: `${Math.max(height, 64)}px`,
+              left: 0,
+              right: 0,
+              backgroundColor: event.color,
+            }}
+          >
+            <div className="font-medium truncate">{event.title}</div>
+            <div className="text-xs opacity-90 truncate">
+              {event.startTime} – {event.endTime}
+            </div>
+          </div>
+        )
+      })
+
+  const ModalOverlay = ({
+    children,
+    onClose,
+  }: {
+    children: React.ReactNode
+    onClose?: () => void
+  }) => (
     <div
       className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50"
-      onMouseDown={onClose}           // <-- fires when you click anywhere outside
+      onMouseDown={onClose}
     >
-      {/* wrap the content so no inner mouseDown ever bubbles out */}
-      <div onMouseDown={e => e.stopPropagation()}>
-        {children}
-      </div>
+      <div onMouseDown={e => e.stopPropagation()}>{children}</div>
     </div>
-  );
-
-  const ModalContent = ({ children, title }: { children: React.ReactNode, title: string }) => (
-    <div className="bg-white rounded-xl shadow-xl w-full max-w-md transform transition-all">
+  )
+  const ModalContent = ({
+    children,
+    title,
+  }: {
+    children: React.ReactNode
+    title: string
+  }) => (
+    <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
       <div className="p-6">
         <h2 className="text-2xl font-bold text-[#1B3B29] mb-6">{title}</h2>
         {children}
       </div>
     </div>
-  );
-
-  const renderTimeLabels = () => {
-    return timeSlots.map((slot, idx) => (
-      <div
-        key={`time-${idx}`}
-        className="h-8 border-r border-[#E0E0E0] flex items-center justify-end pr-2 bg-[#F7F5EF]"
-      >
-        {idx % 2 === 0 && (
-          <span className="text-xs text-[#70757A]">
-            {slot}
-          </span>
-        )}
-      </div>
-    ));
-  };
+  )
 
   return (
     <div className="bg-[#F7F5EF] min-h-screen p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
-          <div className="mb-4 md:mb-0">
-            <h1 className="text-3xl md:text-4xl font-bold text-[#1B3B29] mb-1">
-              Weekly Calendar
-            </h1>
-            <p className="text-md text-[#5F6368]">
-              {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setWeekIndex(p => Math.max(0, p - 1))}
-              disabled={weekIndex === 0}
-              className="px-4 py-2 bg-white text-[#1B3B29] border border-[#DADCE0] rounded-lg hover:bg-[#F1F3F4] transition disabled:opacity-50"
-            >
-              ← Previous
-            </button>
-            <button
-              onClick={() => setWeekIndex(0)}
-              className="px-4 py-2 bg-white text-[#1B3B29] border border-[#DADCE0] rounded-lg hover:bg-[#F1F3F4] transition"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => setWeekIndex(p => Math.min(weeks.length - 1, p + 1))}
-              disabled={weekIndex === weeks.length - 1}
-              className="px-4 py-2 bg-white text-[#1B3B29] border border-[#DADCE0] rounded-lg hover:bg-[#F1F3F4] transition disabled:opacity-50"
-            >
-              Next →
-            </button>
-          </div>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
+        <div className="mb-4 md:mb-0">
+          <h1 className="text-3xl md:text-4xl font-bold text-[#1B3B29] mb-1">
+            Weekly Calendar
+          </h1>
+          <p className="text-md text-[#5F6368]">
+            {currentDate.toLocaleDateString('en-US', {
+              month: 'long',
+              year: 'numeric',
+            })}
+          </p>
         </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setWeekIndex(w => Math.max(0, w - 1))}
+            disabled={weekIndex === 0}
+            className="px-4 py-2 bg-white text-[#1B3B29] border rounded-lg disabled:opacity-50"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={() => setWeekIndex(0)}
+            className="px-4 py-2 bg-white text-[#1B3B29] border rounded-lg"
+          >
+            Today
+          </button>
+          <button
+            onClick={() => setWeekIndex(w => Math.min(weeks.length - 1, w + 1))}
+            disabled={weekIndex === weeks.length - 1}
+            className="px-4 py-2 bg-white text-[#1B3B29] border rounded-lg disabled:opacity-50"
+          >
+            Next →
+          </button>
+        </div>
+      </div>
 
-        {/* Calendar Grid */}
-        <div 
-          className="border border-[#E0E0E0] rounded-lg overflow-hidden shadow-sm bg-[#F7F5EF]"
-          ref={calendarRef}
-        >
-          {/* Calendar Header Row */}
-          <div className="grid grid-cols-8 bg-[#FAFAFA]">
-            <div className="border-r border-b border-[#E0E0E0]"></div>
-            {weeks[weekIndex].map((dayObj, idx) => (
-              <div 
-                key={`${dayObj.date}-${idx}`} 
-                className={`p-2 border-b border-[#E0E0E0] text-center ${isToday(dayObj.date) ? 'bg-[#E6F4EA]' : ''}`}
+      {/* Calendar Grid */}
+      <div
+        className="border rounded-lg overflow-hidden shadow-sm bg-[#F7F5EF] relative"
+        ref={calendarRef}
+      >
+        {/* Header Row */}
+        <div className="grid grid-cols-8 bg-[#FAFAFA]">
+          <div className="border-r border-b border-[#E0E0E0]" />
+          {weeks[weekIndex].map((d, i) => (
+            <div
+              key={i}
+              className={`p-2 border-b border-[#E0E0E0] text-center ${
+                isToday(d.date) ? 'bg-[#E6F4EA]' : ''
+              }`}
+            >
+              <div className="text-sm font-medium text-[#70757A]">{d.day}</div>
+              <div
+                className={`mt-1 w-8 h-8 flex items-center justify-center mx-auto rounded-full ${
+                  isToday(d.date) ? 'bg-[#1B3B29] text-white' : 'text-[#3C4043]'
+                }`}
               >
-                <div className="text-[#70757A] text-sm font-medium">{dayObj.day}</div>
-                <div className={`mt-1 w-8 h-8 flex items-center justify-center mx-auto rounded-full ${isToday(dayObj.date) ? 'bg-[#1B3B29] text-white' : 'text-[#3C4043]'}`}>
-                  {dayObj.date}
-                </div>
+                {d.date}
               </div>
-            ))}
-          </div>
-
-          {/* Calendar Body */}
-          <div className="grid grid-cols-8 relative pt-8">
-            {/* Time Labels */}
-            <div className="flex flex-col">
-              {renderTimeLabels()}
             </div>
+          ))}
+        </div>
 
-            {/* Calendar Columns */}
-            {weeks[weekIndex].map((_, dayIdx) => (
-              <div key={`day-${dayIdx}`} className="flex flex-col relative">
-                {timeSlots.map((_, timeIdx) => (
-                  <div
-                    key={`slot-${dayIdx}-${timeIdx}`}
-                    className={`h-8 border-b border-[#E0E0E0] ${timeIdx === 0 ? 'border-t-0' : ''} hover:bg-[#EDECE8] transition cursor-pointer bg-[#F7F5EF]`}
-                    onClick={() => handleTimeSlotClick(dayIdx, timeIdx)}
-                  />
-                ))}
-                {renderEvents()}
+        {/* Body */}
+        <div className="h-[768px] overflow-y-auto grid grid-cols-8 relative pt-8">
+          {/* Time labels */}
+          <div className="flex flex-col">
+            {timeSlots.map((slot, idx) => (
+              <div
+                key={idx}
+                className="h-8 border-r border-[#E0E0E0] flex items-center justify-end pr-2 bg-[#F7F5EF]"
+              >
+                {idx % 2 === 0 && (
+                  <span className="text-xs text-[#70757A]">{slot}</span>
+                )}
               </div>
             ))}
           </div>
+
+          {/* Day columns */}
+          {weeks[weekIndex].map((_, dayIdx) => (
+            <div key={dayIdx} className="flex flex-col relative">
+              {timeSlots.map((_, tIdx) => (
+                <div
+                  key={tIdx}
+                  className="h-8 border-b border-[#E0E0E0] hover:bg-[#EDECE8] cursor-pointer bg-[#F7F5EF]"
+                  onClick={() => handleTimeSlotClick(dayIdx, tIdx)}
+                />
+              ))}
+              {renderEvents(dayIdx)}
+            </div>
+          ))}
+
+          {/* “Now” line */}
+          {weekIndex === 0 && (
+            <div
+              className="absolute bg-red-500 h-[2px] z-10"
+              style={{
+                top: `${nowPos + 16}px`,
+                left: `calc(100%/8)`, 
+                width: `calc((100%/8)*7)`,
+              }}
+            />
+          )}
         </div>
       </div>
 
-      {/* Event Creation Modal */}
+      {/* Create Modal */}
       {isEditing && (
-  <ModalOverlay onClose={() => setIsEditing(false)}>
-    <ModalContent title="Create New Event">
-      <div className="space-y-4">
-        {/* Title */}
-        <div>
-          <label className="block text-sm font-medium text-[#5F6368] mb-1">
-            Title
-          </label>
-          <input
-            type="text"
-            autoFocus
-            className="w-full p-2 border border-[#DADCE0] rounded-lg focus:ring-2 focus:ring-[#1B3B29]"
-            value={newEvent.title}
-            onChange={e => setNewEvent(ne => ({ ...ne, title: e.target.value }))}
-            onMouseDown={e => e.stopPropagation()}
-            placeholder="Event title"
-          />
-        </div>
-
-        {/* Times */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-[#5F6368] mb-1">
-              Start Time
-            </label>
-            <select
-              className="w-full p-2 border border-[#DADCE0] rounded-lg"
-              value={newEvent.startTime}
-              onChange={e => handleTimeChange(e.target.value, true, "new")}
-              onMouseDown={e => e.stopPropagation()}
-            >
-              {timeSlots.map((slot, idx) => (
-                <option key={idx} value={slot}>
-                  {slot}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[#5F6368] mb-1">
-              End Time
-            </label>
-            <select
-              className="w-full p-2 border border-[#DADCE0] rounded-lg"
-              value={newEvent.endTime}
-              onChange={e => handleTimeChange(e.target.value, false, "new")}
-              onMouseDown={e => e.stopPropagation()}
-            >
-              {timeSlots.map((slot, idx) => (
-                <option
-                  key={idx}
-                  value={slot}
-                  disabled={timeToPosition(slot) <= timeToPosition(newEvent.startTime)}
-                >
-                  {slot}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3 pt-4">
-          <button
-            className="px-4 py-2 border rounded-lg text-[#5F6368]"
-            onMouseDown={e => { e.stopPropagation(); setIsEditing(false); }}
-          >
-            Cancel
-          </button>
-          <button
-            className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg"
-            onMouseDown={e => {
-              e.stopPropagation();
-              handleCreateEvent();
-            }}
-          >
-            Create Event
-          </button>
-        </div>
-      </div>
-    </ModalContent>
-  </ModalOverlay>
-)}
-
-      {/* Event Details Modal */}
-      {selectedEvent && (
-        <ModalOverlay onClose={() => setSelectedEvent(null)}>
-          <ModalContent title="Event Details">
+        <ModalOverlay onClose={() => setIsEditing(false)}>
+          <ModalContent title="Create New Event">
             <div className="space-y-4">
+              {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-1">Title</label>
+                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  Title
+                </label>
                 <input
                   type="text"
-                  className="w-full p-2 border border-[#DADCE0] rounded-lg focus:ring-2 focus:ring-[#1B3B29] focus:border-transparent"
-                  value={selectedEvent.title}
-                  onChange={(e) => setSelectedEvent({...selectedEvent, title: e.target.value})}
-                  onClick={(e) => e.stopPropagation()}
+                  autoFocus
+                  disabled={newEvent.isDeepWork}
+                  className={`w-full p-2 border rounded-lg focus:ring-2 ${
+                    newEvent.isDeepWork
+                      ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
+                      : 'focus:ring-[#1B3B29]'
+                  }`}
+                  value={newEvent.title}
+                  onChange={e => setNewEvent(ne => ({ ...ne, title: e.target.value }))}
                 />
               </div>
-              
+              {/* Start & End */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">Start Time</label>
+                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                    Start Time
+                  </label>
                   <select
-                    className="w-full p-2 border border-[#DADCE0] rounded-lg"
-                    value={selectedEvent.startTime}
-                    onChange={(e) => handleTimeChange(e.target.value, true, 'existing')}
-                    onClick={(e) => e.stopPropagation()}
+                    className="w-full p-2 border rounded-lg"
+                    value={newEvent.startTime}
+                    onChange={e => handleTimeChange(e.target.value, true, 'new')}
                   >
-                    {timeSlots.map((slot, idx) => (
-                      <option key={`edit-start-${idx}`} value={slot}>
-                        {slot === "12:00 AM" ? "12:00 AM" : slot}
-                      </option>
+                    {timeSlots.map((s, i) => (
+                      <option key={i} value={s}>{s}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">End Time</label>
+                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                    End Time
+                  </label>
                   <select
-                    className="w-full p-2 border border-[#DADCE0] rounded-lg"
-                    value={selectedEvent.endTime}
-                    onChange={(e) => handleTimeChange(e.target.value, false, 'existing')}
-                    onClick={(e) => e.stopPropagation()}
+                    className="w-full p-2 border rounded-lg"
+                    value={newEvent.endTime}
+                    onChange={e => handleTimeChange(e.target.value, false, 'new')}
                   >
-                    {timeSlots.map((slot, idx) => (
-                      <option 
-                        key={`edit-end-${idx}`} 
-                        value={slot}
-                        disabled={timeToPosition(slot) <= timeToPosition(selectedEvent.startTime)}
+                    {timeSlots.map((s, i) => (
+                      <option
+                        key={i}
+                        value={s}
+                        disabled={timeToPosition(s) <= timeToPosition(newEvent.startTime)}
                       >
-                        {slot === "12:00 AM" ? "12:00 AM" : slot}
+                        {s}
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
-
+              {/* Color */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-2">Color</label>
-                <div className="flex gap-3">
-                  {eventColors.map(color => (
-                    <div
-                      key={color}
-                      className={`w-8 h-8 rounded-full cursor-pointer transition-transform hover:scale-110 ${selectedEvent.color === color ? 'ring-2 ring-offset-2 ring-[#1B3B29]' : ''}`}
-                      style={{ backgroundColor: color }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedEvent({...selectedEvent, color});
-                      }}
-                    />
-                  ))}
+                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  Event Color
+                </label>
+                <input
+                  type="color"
+                  value={newEvent.color}
+                  onChange={e => setNewEvent(ne => ({ ...ne, color: e.target.value }))}
+                  className="w-12 h-8 p-0 border-0"
+                />
+              </div>
+              {/* Deep Work */}
+              <label className="inline-flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={newEvent.isDeepWork}
+                  onChange={e => setNewEvent(ne => ({ ...ne, isDeepWork: e.target.checked }))}
+                  className="h-4 w-4 text-[#FF7043] rounded"
+                />
+                <span className="text-sm">Deep Work?</span>
+              </label>
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  className="px-4 py-2 border rounded-lg text-[#5F6368]"
+                  onClick={() => setIsEditing(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg"
+                  onClick={handleCreateEvent}
+                >
+                  Create Event
+                </button>
+              </div>
+            </div>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+
+      {/* Edit Modal */}
+      {selectedEvent && (
+        <ModalOverlay onClose={() => setSelectedEvent(null)}>
+          <ModalContent title="Edit Event">
+            <div className="space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  disabled={!!selectedEvent.isDeepWork}
+                  className={`w-full p-2 border rounded-lg focus:ring-2 ${
+                    selectedEvent.isDeepWork
+                      ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
+                      : 'focus:ring-[#1B3B29]'
+                  }`}
+                  value={selectedEvent.title}
+                  onChange={e => setSelectedEvent(se => se && ({ ...se, title: e.target.value }))}
+                />
+              </div>
+              {/* Start & End */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                    Start Time
+                  </label>
+                  <select
+                    className="w-full p-2 border rounded-lg"
+                    value={selectedEvent.startTime}
+                    onChange={e => handleTimeChange(e.target.value, true, 'existing')}
+                  >
+                    {timeSlots.map((s, i) => <option key={i} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                    End Time
+                  </label>
+                  <select
+                    className="w-full p-2 border rounded-lg"
+                    value={selectedEvent.endTime}
+                    onChange={e => handleTimeChange(e.target.value, false, 'existing')}
+                  >
+                    {timeSlots.map((s, i) => (
+                      <option
+                        key={i}
+                        value={s}
+                        disabled={timeToPosition(s) <= timeToPosition(selectedEvent.startTime)}
+                      >
+                        {s}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-
+              {/* Color */}
+              <div>
+                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  Event Color
+                </label>
+                <input
+                  type="color"
+                  value={selectedEvent.color}
+                  onChange={e => setSelectedEvent(se => se && ({ ...se, color: e.target.value }))}
+                  className="w-12 h-8 p-0 border-0"
+                />
+              </div>
+              {/* Deep Work */}
+              <label className="inline-flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={!!selectedEvent.isDeepWork}
+                  onChange={e => setSelectedEvent(se => se && ({ ...se, isDeepWork: e.target.checked }))}
+                  className="h-4 w-4 text-[#FF7043] rounded"
+                />
+                <span className="text-sm">Deep Work?</span>
+              </label>
+              {/* Actions */}
               <div className="flex justify-between pt-4">
                 <button
-                  className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteEvent();
-                  }}
+                  className="px-4 py-2 text-red-600 border rounded-lg"
+                  onClick={handleDeleteEvent}
                 >
                   Delete
                 </button>
                 <div className="flex gap-3">
                   <button
-                    className="px-4 py-2 border border-[#DADCE0] rounded-lg text-[#5F6368] hover:bg-[#F1F3F4] transition"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedEvent(null);
-                    }}
+                    className="px-4 py-2 border rounded-lg text-[#5F6368]"
+                    onClick={() => setSelectedEvent(null)}
                   >
                     Cancel
                   </button>
                   <button
-                    className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg hover:bg-[#145A32] transition"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUpdateEvent();
-                    }}
+                    className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg"
+                    onClick={handleUpdateEvent}
                   >
                     Save Changes
                   </button>
@@ -505,7 +571,5 @@ function Calendar() {
         </ModalOverlay>
       )}
     </div>
-  );
+  )
 }
-
-export default Calendar;

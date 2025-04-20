@@ -178,7 +178,7 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
             {isPaused && (
               <button
                 onClick={handleResume}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
               >
                 Resume
               </button>
