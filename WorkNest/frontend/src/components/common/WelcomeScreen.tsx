@@ -14,7 +14,7 @@ function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
 
       <div className="z-10 max-w-xl text-center">
         <h1 className="text-5xl font-bold text-[#1B3B29] mb-6 leading-tight">
-          Welcome to WorkNest 🧘‍♂️
+          Welcome to WorkNest
         </h1>
         <p className="text-lg text-[#4F4F4F] mb-10">
           Find your flow. Organize your mind.  

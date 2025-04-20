@@ -1,487 +1,310 @@
-import React, { useState, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { supabase } from '../services/tasksSupabase';
+// frontend/src/InteractiveTodo.tsx
+import React, { useState } from 'react';
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult
+} from 'react-beautiful-dnd';
 
-type Task = { 
-  id: string; 
-  content: string;
-  column_id: string;
-  position: number;
-};
+type ColumnId = 'todo' | 'doing' | 'done';
+type AllColumnId = ColumnId | 'completed';
 
-type Column = { 
-  id: string; 
-  title: string; 
-  tasks: Task[] 
-};
+type Task = { id: string; content: string };
+type Column = { id: AllColumnId; title: string; tasks: Task[] };
 
-const columnTitles = {
-  todo: 'High Priority 🔥',
-  doing: 'Medium Priority ⚠️',
-  done: 'Low Priority ✅',
-  completed: 'Completed 🎉',
+const fullViewData: Record<AllColumnId, Column> = {
+  todo:      { id: 'todo',      title: 'High Priority 🔥',   tasks: [] },
+  doing:     { id: 'doing',     title: 'Medium Priority ⚠️', tasks: [] },
+  done:      { id: 'done',      title: 'Low Priority ✅',     tasks: [] },
+  completed: { id: 'completed', title: 'Completed 🎉',        tasks: [] },
 };
 
 const InteractiveTodo: React.FC = () => {
-  const [columns, setColumns] = useState<Record<string, Column>>({
-    todo: { id: 'todo', title: 'High Priority 🔥', tasks: [] },
-    doing: { id: 'doing', title: 'Medium Priority ⚠️', tasks: [] },
-    done: { id: 'done', title: 'Low Priority ✅', tasks: [] },
-    completed: { id: 'completed', title: 'Completed 🎉', tasks: [] },
-  });
+  const [columns, setColumns] = useState<Record<AllColumnId, Column>>(() => ({ ...fullViewData }));
   const [newTask, setNewTask] = useState('');
-  const [targetColumn, setTargetColumn] = useState<'todo' | 'doing' | 'done'>('todo');
-  const [loading, setLoading] = useState(true);
+  const [targetColumn, setTargetColumn] = useState<ColumnId>('todo');
+  const [taskIdCounter, setTaskIdCounter] = useState(1);
 
-  // Edit modal state
-  const [modalTask, setModalTask] = useState<{ task: Task; columnId: string } | null>(null);
+  const [modalTask, setModalTask] = useState<{ task: Task; columnId: AllColumnId } | null>(null);
   const [modalName, setModalName] = useState('');
-  const [modalPriority, setModalPriority] = useState<'todo' | 'doing' | 'done'>('todo');
+  const [modalPriority, setModalPriority] = useState<ColumnId>('todo');
 
-  // Fetch tasks from Supabase when component mounts
-  useEffect(() => {
-    fetchTasks();
-  }, []);
+  const [decomposing, setDecomposing] = useState<string | null>(null);
+  const [sortingCol, setSortingCol] = useState<AllColumnId | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
 
-  const fetchTasks = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('position', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        // Group tasks by column
-        const columnData: Record<string, Column> = {
-          todo: { id: 'todo', title: columnTitles.todo, tasks: [] },
-          doing: { id: 'doing', title: columnTitles.doing, tasks: [] },
-          done: { id: 'done', title: columnTitles.done, tasks: [] },
-          completed: { id: 'completed', title: columnTitles.completed, tasks: [] },
-        };
-
-        // Convert database tasks to our Task type and organize by column
-        data.forEach((task) => {
-          const columnId = task.column_id;
-          if (columnData[columnId]) {
-            columnData[columnId].tasks.push({
-              id: task.id,
-              content: task.content,
-              column_id: task.column_id,
-              position: task.position,
-            });
-          }
-        });
-
-        // Sort tasks by position within each column
-        Object.keys(columnData).forEach(columnId => {
-          columnData[columnId].tasks.sort((a, b) => a.position - b.position);
-        });
-
-        setColumns(columnData);
-      }
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddTask = async () => {
+  // ─── Handlers ───────────────────────────────────────────────────────────
+  const handleAddTask = () => {
     if (!newTask.trim()) return;
-    
-    try {
-      // Get highest position for the target column
-      const highestPosition = Math.max(
-        0,
-        ...columns[targetColumn].tasks.map(task => task.position)
-      );
-      
-      // Insert new task into Supabase
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert({
-          content: newTask,
-          column_id: targetColumn,
-          priority: targetColumn, // Same as column_id for simplicity
-          position: highestPosition + 1,
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (data) {
-        // Update local state
-        setColumns(prev => ({
-          ...prev,
-          [targetColumn]: { 
-            ...prev[targetColumn], 
-            tasks: [
-              ...prev[targetColumn].tasks, 
-              {
-                id: data.id,
-                content: data.content,
-                column_id: data.column_id,
-                position: data.position,
-              }
-            ],
-          },
-        }));
-      }
-      
-      setNewTask('');
-    } catch (error) {
-      console.error('Error adding task:', error);
-    }
-  };
-
-  const handleDelete = async (colId: string, taskId: string) => {
-    try {
-      // Delete task from Supabase
-      const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('id', taskId);
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Update local state
-      setColumns(prev => ({
-        ...prev,
-        [colId]: { 
-          ...prev[colId], 
-          tasks: prev[colId].tasks.filter(t => t.id !== taskId),
-        },
-      }));
-    } catch (error) {
-      console.error('Error deleting task:', error);
-    }
-  };
-
-  const handleComplete = async (colId: string, task: Task) => {
-    try {
-      // Get highest position for the completed column
-      const highestPosition = Math.max(
-        0,
-        ...columns.completed.tasks.map(task => task.position)
-      );
-      
-      // Update task in Supabase
-      const { error } = await supabase
-        .from('tasks')
-        .update({ 
-          column_id: 'completed',
-          priority: 'completed',
-          position: highestPosition + 1,
-        })
-        .eq('id', task.id);
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Update local state
-      setColumns(prev => {
-        // remove from original column
-        const updatedSource = prev[colId].tasks.filter(t => t.id !== task.id);
-        // append to completed with updated fields
-        const updatedTask = { ...task, column_id: 'completed', position: highestPosition + 1 };
-        
-        return {
-          ...prev,
-          [colId]: { ...prev[colId], tasks: updatedSource },
-          completed: { ...prev.completed, tasks: [...prev.completed.tasks, updatedTask] },
-        };
-      });
-    } catch (error) {
-      console.error('Error completing task:', error);
-    }
-  };
-
-  const onDragEnd = async (result: DropResult) => {
-    const { source, destination } = result;
-    if (!destination) return;
-    
-    const fromKey = source.droppableId;
-    const toKey = destination.droppableId;
-    
-    const fromTasks = [...columns[fromKey].tasks];
-    const toTasks = fromKey === toKey ? fromTasks : [...columns[toKey].tasks];
-    
-    const [moved] = fromTasks.splice(source.index, 1);
-    toTasks.splice(destination.index, 0, moved);
-    
-    // Update positions for each affected task
-    const updatedToTasks = toTasks.map((task, index) => ({
-      ...task,
-      position: index,
-      column_id: toKey,
-    }));
-    
-    const updatedFromTasks = fromTasks.map((task, index) => ({
-      ...task,
-      position: index,
-    }));
-    
-    // Update local state optimistically
+    const newObj: Task = { id: `task-${taskIdCounter}`, content: newTask };
     setColumns(prev => ({
       ...prev,
-      [fromKey]: { ...prev[fromKey], tasks: updatedFromTasks },
-      [toKey]: { ...prev[toKey], tasks: updatedToTasks },
+      [targetColumn]: {
+        ...prev[targetColumn],
+        tasks: [...prev[targetColumn].tasks, newObj],
+      },
     }));
-    
-    try {
-      // Update the moved task first
-      const movedTask = updatedToTasks[destination.index];
-      await supabase
-        .from('tasks')
-        .update({ 
-          column_id: toKey,
-          priority: toKey,
-          position: destination.index, 
-        })
-        .eq('id', movedTask.id);
-      
-      // Then batch update all other affected tasks in the destination column
-      // This could be optimized to only update those that changed
-      for (let i = 0; i < updatedToTasks.length; i++) {
-        if (i !== destination.index) { // Skip the one we just updated
-          const task = updatedToTasks[i];
-          await supabase
-            .from('tasks')
-            .update({ position: i })
-            .eq('id', task.id);
-        }
-      }
-      
-      // If we moved between columns, update positions in source column too
-      if (fromKey !== toKey) {
-        for (let i = 0; i < updatedFromTasks.length; i++) {
-          const task = updatedFromTasks[i];
-          await supabase
-            .from('tasks')
-            .update({ position: i })
-            .eq('id', task.id);
-        }
-      }
-    } catch (error) {
-      console.error('Error updating task positions:', error);
-      // On error, refresh tasks from database to ensure consistency
-      fetchTasks();
-    }
+    setTaskIdCounter(prev => prev + 1);
+    setNewTask('');
   };
 
-  const openEditModal = (task: Task, columnId: string) => {
+  const handleDelete = (colId: AllColumnId, taskId: string) => {
+    setColumns(prev => ({
+      ...prev,
+      [colId]: {
+        ...prev[colId],
+        tasks: prev[colId].tasks.filter(t => t.id !== taskId),
+      },
+    }));
+  };
+
+  const handleComplete = (colId: AllColumnId, task: Task) => {
+    setColumns(prev => {
+      const remaining = prev[colId].tasks.filter(t => t.id !== task.id);
+      return {
+        ...prev,
+        [colId]: { ...prev[colId], tasks: remaining },
+        completed: { ...prev.completed, tasks: [...prev.completed.tasks, task] },
+      };
+    });
+  };
+
+  const onDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination) return;
+
+    const fromKey = source.droppableId as AllColumnId;
+    const toKey   = destination.droppableId as AllColumnId;
+
+    const fromTasks = Array.from(columns[fromKey].tasks);
+    const toTasks   = fromKey === toKey
+      ? fromTasks
+      : Array.from(columns[toKey].tasks);
+
+    const [moved] = fromTasks.splice(source.index, 1);
+    toTasks.splice(destination.index, 0, moved);
+
+    setColumns(prev => ({
+      ...prev,
+      [fromKey]: { ...prev[fromKey], tasks: fromTasks },
+      [toKey]:   { ...prev[toKey],   tasks: toTasks },
+    }));
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ─── Edit Modal ────────────────────────────────────────────────────────
+  const openEditModal = (task: Task, columnId: AllColumnId) => {
     setModalTask({ task, columnId });
     setModalName(task.content);
-    setModalPriority(columnId as 'todo' | 'doing' | 'done');
+    if (columnId !== 'completed') setModalPriority(columnId as ColumnId);
   };
-  
   const closeModal = () => setModalTask(null);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!modalTask) return;
     const { task, columnId } = modalTask;
-    
-    try {
-      // Determine if we're changing columns
-      const isChangingColumn = modalPriority !== columnId;
-      
-      // Get highest position if changing columns
-      let newPosition = task.position;
-      if (isChangingColumn) {
-        newPosition = Math.max(
-          0,
-          ...columns[modalPriority].tasks.map(t => t.position)
-        ) + 1;
-      }
-      
-      // Update task in Supabase
-      const { data, error } = await supabase
-        .from('tasks')
-        .update({
-          content: modalName,
-          column_id: modalPriority,
-          priority: modalPriority,
-          position: newPosition,
-        })
-        .eq('id', task.id)
-        .select()
-        .single();
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (data) {
-        // Update local state
-        const updatedTask = {
-          id: data.id,
-          content: data.content,
-          column_id: data.column_id,
-          position: data.position,
+    const updatedTask = { ...task, content: modalName };
+
+    setColumns(prev => {
+      if (modalPriority === columnId) {
+        // same column
+        return {
+          ...prev,
+          [columnId]: {
+            ...prev[columnId],
+            tasks: prev[columnId].tasks.map(t =>
+              t.id === task.id ? updatedTask : t
+            ),
+          },
         };
-        
-        setColumns(prev => {
-          if (modalPriority === columnId) {
-            // Same column, just update the task
-            return {
-              ...prev,
-              [columnId]: {
-                ...prev[columnId],
-                tasks: prev[columnId].tasks.map(t => 
-                  t.id === task.id ? updatedTask : t
-                ),
-              },
-            };
-          } else {
-            // Moving to a different column
-            return {
-              ...prev,
-              [columnId]: {
-                ...prev[columnId],
-                tasks: prev[columnId].tasks.filter(t => t.id !== task.id),
-              },
-              [modalPriority]: {
-                ...prev[modalPriority],
-                tasks: [...prev[modalPriority].tasks, updatedTask],
-              },
-            };
-          }
-        });
       }
-      
-      closeModal();
-    } catch (error) {
-      console.error('Error updating task:', error);
-    }
+      // move to new column
+      return {
+        ...prev,
+        [columnId]: {
+          ...prev[columnId],
+          tasks: prev[columnId].tasks.filter(t => t.id !== task.id),
+        },
+        [modalPriority]: {
+          ...prev[modalPriority],
+          tasks: [...prev[modalPriority].tasks, updatedTask],
+        },
+      };
+    });
+
+    closeModal();
   };
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-full text-white">Loading tasks...</div>;
-  }
+  const handleAISuggestPriority = async () => {
+    if (!modalTask) return;
+    const api: any = window.electronAPI;
+    if (!api?.generateAI) return;
+
+    setSuggesting(true);
+    try {
+      const prompt = [
+        `Given the task below, classify its priority as High, Medium, or Low.`,
+        `Return just one of: High, Medium, or Low.`,
+        `Task: "${modalName}"`
+      ].join('\n');
+      const { text } = await api.generateAI(prompt);
+      const choice = text.trim().toLowerCase();
+      if (choice.startsWith('high')) setModalPriority('todo');
+      else if (choice.startsWith('medium')) setModalPriority('doing');
+      else setModalPriority('done');
+    } finally {
+      setSuggesting(false);
+    }
+  };
+  // ────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 bg-[#181414] min-h-screen">
-      {/* Add new */}
-      <div className="flex gap-2 max-w-xl mx-auto mb-4">
-        <input
-          className="flex-1 border border-gray-700 bg-[#242424] text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
-          placeholder="New task..."
-          value={newTask}
-          onChange={e => setNewTask(e.target.value)}
-        />
-        <select
-          className="border border-gray-700 bg-[#242424] text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
-          value={targetColumn}
-          onChange={e => setTargetColumn(e.target.value as any)}
-        >
-          <option value="todo">High 🔥</option>
-          <option value="doing">Medium ⚠️</option>
-          <option value="done">Low ✅</option>
-        </select>
-        <button 
-          onClick={handleAddTask} 
-          className="bg-[#1B3B29] text-white px-6 py-2 rounded hover:bg-[#152b1f]"
-        >
-          Add
-        </button>
-      </div>
+    <div className="bg-[#181414] min-h-screen p-4 flex justify-center items-start">
+      <div className="w-full max-w-7xl">
+        {/* Add new task */}
+        <div className="flex gap-2 max-w-xl mx-auto mb-4">
+          <input
+            className="flex-1 border border-gray-700 bg-[#242424] text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
+            placeholder="New task..."
+            value={newTask}
+            onChange={e => setNewTask(e.target.value)}
+          />
+          <select
+            className="border border-gray-700 bg-[#242424] text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
+            value={targetColumn}
+            onChange={e => setTargetColumn(e.target.value as ColumnId)}
+          >
+            <option value="todo">High 🔥</option>
+            <option value="doing">Medium ⚠️</option>
+            <option value="done">Low ✅</option>
+          </select>
+          <button
+            onClick={handleAddTask}
+            className="bg-[#1B3B29] hover:bg-[#152b1f] text-white px-6 py-2 rounded"
+          >
+            Add
+          </button>
+        </div>
 
-      {/* Board */}
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex gap-4 px-4 overflow-x-auto pb-4">
-          {Object.entries(columns).map(([colId, col]) => (
-            <Droppable droppableId={colId} key={colId}>
-              {provided => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="bg-[#242424] border border-gray-700 rounded p-4 w-64 flex-shrink-0"
-                >
-                  <h3 className="text-center font-bold mb-3 text-white">{col.title}</h3>
-                  {col.tasks.map((t, i) => (
-                    <Draggable key={t.id} draggableId={t.id} index={i}>
-                      {prov => (
-                        <div
-                          ref={prov.innerRef}
-                          {...prov.draggableProps}
-                          {...prov.dragHandleProps}
-                          className="p-3 mb-2 bg-[#333333] rounded flex justify-between items-center cursor-pointer hover:bg-[#3a3a3a]"
-                          onDoubleClick={() => openEditModal(t, colId)}
-                        >
-                          <span className="text-white">{t.content}</span>
-                          <div className="flex gap-2">
-                            {colId !== 'completed' && (
-                              <button
-                                onClick={() => handleComplete(colId, t)}
-                                className="text-green-500 font-bold"
-                              >
-                                ✔
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDelete(colId, t.id)}
-                              className="text-red-500"
+        {/* Board */}
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div className="flex gap-4 px-4 overflow-auto pb-4">
+            {Object.entries(columns).map(([colId, col]) => (
+              <Droppable droppableId={colId} key={colId}>
+                {provided => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="bg-[#242424] border border-gray-700 rounded p-4 w-64 flex-shrink-0"
+                  >
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-bold text-white">{col.title}</h3>
+                      <button
+                        onClick={() => handleAISuggestPriority()}
+                        disabled={sortingCol === colId}
+                        className="text-purple-400 hover:underline text-sm"
+                      >
+                        {sortingCol === colId ? 'Sorting…' : 'AI Sort'}
+                      </button>
+                    </div>
+
+                    {col.tasks.map((t, i) => {
+                      const isSub = t.id.includes('-sub-');
+                      return (
+                        <Draggable key={t.id} draggableId={t.id} index={i}>
+                          {prov => (
+                            <div
+                              ref={prov.innerRef}
+                              {...prov.draggableProps}
+                              {...prov.dragHandleProps}
+                              onClick={() => openEditModal(t, colId as AllColumnId)}
+                              className={`
+                                p-3 mb-2 bg-[#333333] rounded flex flex-col justify-between
+                                ${isSub ? 'pl-4 border-l-2 border-gray-600' : ''}
+                                cursor-pointer hover:bg-[#3a3a3a]
+                              `}
                             >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          ))}
-        </div>
-      </DragDropContext>
-
-      {/* Edit Modal with blur backdrop */}
-      {modalTask && (
-        <div className="fixed inset-0 backdrop-filter backdrop-blur-lg flex items-center justify-center z-50">
-          <div className="bg-[#242424] p-6 rounded-lg w-80 shadow-lg text-white border border-gray-700">
-            <h4 className="mb-3 font-semibold">Edit Task</h4>
-            <input
-              className="w-full border border-gray-700 bg-[#333333] p-2 rounded mb-3 text-white focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
-              value={modalName}
-              onChange={e => setModalName(e.target.value)}
-            />
-            <select
-              className="w-full border border-gray-700 bg-[#333333] p-2 rounded mb-4 text-white focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
-              value={modalPriority}
-              onChange={e => setModalPriority(e.target.value as any)}
-            >
-              <option value="todo">High 🔥</option>
-              <option value="doing">Medium ⚠️</option>
-              <option value="done">Low ✅</option>
-            </select>
-            <button 
-              onClick={handleSave} 
-              className="w-full bg-[#1B3B29] text-white py-2 rounded mb-2 hover:bg-[#152b1f]"
-            >
-              Save
-            </button>
-            <button 
-              onClick={closeModal} 
-              className="w-full border border-gray-700 text-white py-2 rounded hover:bg-[#333333]"
-            >
-              Cancel
-            </button>
+                              <span className="text-white break-words mb-2">{t.content}</span>
+                              <div className="flex flex-wrap gap-2 justify-end">
+                                <button
+                                  onClick={e => { e.stopPropagation(); handleDecompose(colId as AllColumnId, t); }}
+                                  disabled={decomposing === t.id}
+                                  className="text-blue-400 px-2 py-1 border border-gray-600 rounded hover:bg-[#2f2f2f]"
+                                >
+                                  {decomposing === t.id ? '…' : 'Decompose'}
+                                </button>
+                                <button
+                                  onClick={e => { e.stopPropagation(); handleComplete(colId as AllColumnId, t); }}
+                                  className="text-green-400 font-bold px-2 py-1 border border-gray-600 rounded hover:bg-[#2f2f2f]"
+                                >
+                                  ✔
+                                </button>
+                                <button
+                                  onClick={e => { e.stopPropagation(); handleDelete(colId as AllColumnId, t.id); }}
+                                  className="text-red-400 px-2 py-1 border border-gray-600 rounded hover:bg-[#2f2f2f]"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            ))}
           </div>
-        </div>
-      )}
+        </DragDropContext>
+
+        {/* Edit Modal */}
+        {modalTask && (
+          <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50">
+            <div className="bg-[#242424] p-6 rounded-lg w-80 shadow-lg border border-gray-700 text-white">
+              <h4 className="mb-3 text-lg font-semibold">Edit Task</h4>
+              <input
+                className="w-full bg-[#333333] border border-gray-600 text-white p-2 rounded mb-3 focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
+                value={modalName}
+                onChange={e => setModalName(e.target.value)}
+              />
+              <div className="flex items-center justify-between mb-4">
+                <select
+                  className="flex-1 bg-[#333333] border border-gray-600 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
+                  value={modalPriority}
+                  onChange={e => setModalPriority(e.target.value as ColumnId)}
+                >
+                  <option value="todo">High 🔥</option>
+                  <option value="doing">Medium ⚠️</option>
+                  <option value="done">Low ✅</option>
+                </select>
+                <button
+                  onClick={handleAISuggestPriority}
+                  disabled={suggesting}
+                  className="ml-2 text-purple-400 text-sm hover:underline"
+                >
+                  {suggesting ? 'Suggesting…' : 'AI Suggest'}
+                </button>
+              </div>
+              <button
+                onClick={handleSave}
+                className="w-full bg-[#1B3B29] hover:bg-[#152b1f] text-white py-2 rounded mb-2"
+              >
+                Save
+              </button>
+              <button
+                onClick={closeModal}
+                className="w-full border border-gray-700 text-gray-300 py-2 rounded hover:bg-[#2a2a2a]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 };
