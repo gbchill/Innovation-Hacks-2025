@@ -2,6 +2,10 @@
 const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
 const path = require('path');
 
+// Disable GPU/WebGPU to suppress warnings
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-features', 'DawnExperimentalSubgroupLimits');
+
 let mainWindow;
 let browserView;
 let currentUrl = 'https://www.google.com';
@@ -19,7 +23,7 @@ function createWindow() {
     },
   });
 
-  // Prevent “MaxListenersExceededWarning”
+  // Prevent "MaxListenersExceededWarning"
   mainWindow.setMaxListeners(20);
 
   // Always adjust BrowserView on resize
@@ -146,13 +150,13 @@ ipcMain.on('create-browser-view', (event, url, sidebarWidth = 0, colorScheme = '
 });
 
 ipcMain.on('browser-go-back', () => {
-  if (browserView && browserView.webContents.navigationHistory.canGoBack()) {
+  if (browserView && browserView.webContents.canGoBack()) {
     browserView.webContents.goBack();
   }
 });
 
 ipcMain.on('browser-go-forward', () => {
-  if (browserView && browserView.webContents.navigationHistory.canGoForward()) {
+  if (browserView && browserView.webContents.canGoForward()) {
     browserView.webContents.goForward();
   }
 });
@@ -175,10 +179,9 @@ ipcMain.on('get-current-url', (event) => {
 
 ipcMain.on('get-navigation-state', (event) => {
   if (browserView) {
-    const nav = browserView.webContents.navigationHistory;
     event.reply('navigation-state', {
-      canGoBack: nav.canGoBack(),
-      canGoForward: nav.canGoForward(),
+      canGoBack: browserView.webContents.canGoBack(),
+      canGoForward: browserView.webContents.canGoForward(),
       isLoading: browserView.webContents.isLoading(),
       currentUrl: browserView.webContents.getURL(),
     });
@@ -222,7 +225,7 @@ ipcMain.on('set-color-scheme', (_, scheme = 'light') => {
         }
       }
     } catch (err) {
-      console.error('Error reloading after color‑scheme change:', err);
+      console.error('Error reloading after color-scheme change:', err);
     }
   }, 500);
 });
@@ -231,6 +234,8 @@ ipcMain.on('remove-browser-view', () => {
   if (browserView) {
     mainWindow.removeBrowserView(browserView);
     browserView = null;
+    // Clear current URL so the input bar doesn't hang onto it
+    currentUrl = '';
   }
 });
 

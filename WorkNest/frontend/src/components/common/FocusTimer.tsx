@@ -1,11 +1,11 @@
+// src/components/common/FocusTimer.tsx
 import { useState, useEffect, useRef } from "react";
 import { ClockIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: boolean) => void }) {
-  const [showPopup, setShowPopup] = useState(false);
   const [hours, setHours] = useState(0);
   const [minutes, setMinutes] = useState(25);
-  const [timeLeft, setTimeLeft] = useState(1500);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [pauseWait, setPauseWait] = useState(false);
@@ -17,8 +17,6 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
     const s = (secs % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   };
-
-  const togglePopup = () => setShowPopup(!showPopup);
 
   const startCountdown = () => {
     intervalRef.current = setInterval(() => {
@@ -43,7 +41,6 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
 
     setClickedButton("start");
     setTimeLeft(totalSecs);
-    setShowPopup(false);
     setIsRunning(true);
     setIsPaused(false);
     onTimerRunning(true);
@@ -92,35 +89,19 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
     return () => clearInterval(intervalRef.current!);
   }, []);
 
-  return (
-    <div className="relative">
-      <button
-        onClick={() => {
-          togglePopup();
-          setClickedButton("clock");
-        }}
-        className={`flex items-center justify-center w-12 h-12 rounded-full transition-colors duration-300 shadow-md ${
-          clickedButton === "clock" ? "bg-forest text-white" : "bg-green-200 text-forest hover:bg-forest hover:text-white"
-        }`}
-      >
-        <ClockIcon className="w-6 h-6 transition-colors duration-300" />
-      </button>
-
-      {showPopup && (
-        <div className="absolute right-0 mt-2 p-4 bg-white rounded-lg shadow-lg w-72 border text-forest z-20">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="font-bold">Set Timer</h2>
-            <button onClick={togglePopup} className="text-forest hover:text-green-800">
-              <XMarkIcon className="w-5 h-5 transition-colors duration-300" />
-            </button>
-          </div>
-
-          <div className="flex gap-4 mb-4">
+  // Timer setup UI - only shown when not running or paused
+  if (!isRunning && !isPaused) {
+    return (
+      <div className="w-full bg-[#242424] rounded-lg shadow-sm p-4">
+        <div className="mb-4">
+          <h2 className="text-center font-medium text-white mb-3">Set Timer</h2>
+          
+          <div className="flex gap-4 mb-4 justify-center">
             <div>
-              <label className="text-sm">Hours</label>
+              <label className="block text-sm text-gray-300 mb-1">Hours</label>
               <input
                 type="number"
-                className="w-16 border rounded p-1"
+                className="w-16 border border-gray-700 rounded p-2 text-center bg-[#181414] text-white"
                 value={hours}
                 min="0"
                 max="5"
@@ -128,10 +109,10 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
               />
             </div>
             <div>
-              <label className="text-sm">Minutes</label>
+              <label className="block text-sm text-gray-300 mb-1">Minutes</label>
               <input
                 type="number"
-                className="w-16 border rounded p-1"
+                className="w-16 border border-gray-700 rounded p-2 text-center bg-[#181414] text-white"
                 value={minutes}
                 min="0"
                 max="59"
@@ -142,60 +123,57 @@ export default function FocusTimer({ onTimerRunning }: { onTimerRunning: (val: b
 
           <button
             onClick={handleStart}
-            className={`w-full py-2 rounded shadow-md transition-colors duration-300 ${
-              clickedButton === "start" ? "bg-forest text-white" : "bg-green-200 text-forest hover:bg-forest hover:text-white"
-            }`}
+            className="w-full py-2 rounded-lg bg-[#1B3B29] text-white hover:bg-opacity-90 transition-all flex items-center justify-center"
           >
-            Start
+            <ClockIcon className="w-5 h-5 ml-3" />
+            Start Focus Timer
           </button>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {(isRunning || isPaused) && (
-        <div className="absolute right-0 top-20 mt-4 p-4 bg-white rounded-xl shadow-lg w-72 border text-center z-10">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-bold text-forest">Focus Timer</h3>
-            <button onClick={togglePopup} className="text-forest hover:text-green-800">
-              <XMarkIcon className="w-5 h-5 transition-colors duration-300" />
-            </button>
-          </div>
-
-          <div className="text-4xl font-mono text-forest mb-4">
-            {formatTime(timeLeft)}
-          </div>
-
-          <div className="flex justify-center gap-3">
-            {isRunning && (
-              <button
-                onClick={handlePause}
-                className={`px-4 py-2 rounded transition-colors duration-300 ${
-                  clickedButton === "pause" ? "bg-forest text-white" : "bg-green-200 text-forest hover:bg-forest hover:text-white"
-                }`}
-              >
-                Pause
-              </button>
-            )}
-            {isPaused && (
-              <button
-                onClick={handleResume}
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
-              >
-                Resume
-              </button>
-            )}
-            <button
-              onClick={handleReset}
-              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition"
-            >
-              Reset
-            </button>
-          </div>
-
-          {pauseWait && (
-            <p className="text-sm text-red-600 mt-2">🧘 Hold on... pausing</p>
-          )}
+  // Active timer UI
+  return (
+    <div className="w-full bg-[#242424] rounded-lg shadow-sm p-4">
+      <div className="text-center mb-4">
+        <div className="text-3xl font-mono text-white font-bold mb-2">
+          {formatTime(timeLeft)}
         </div>
-      )}
+
+        <div className="flex justify-center gap-3">
+          {isRunning && (
+            <button
+              onClick={handlePause}
+              className={`px-4 py-2 rounded-lg transition-colors ${
+                clickedButton === "pause" 
+                  ? "bg-[#1B3B29] text-white" 
+                  : "bg-[#1B3B29] bg-opacity-50 text-white hover:bg-opacity-100"
+              }`}
+            >
+              Pause
+            </button>
+          )}
+          {isPaused && (
+            <button
+              onClick={handleResume}
+              className="bg-[#1B3B29] text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition"
+            >
+              Resume
+            </button>
+          )}
+          <button
+            onClick={handleReset}
+            className="bg-red-800 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+          >
+            Reset
+          </button>
+        </div>
+
+        {pauseWait && (
+          <p className="text-sm text-red-400 mt-3">🧘 Hold on... pausing</p>
+        )}
+      </div>
     </div>
   );
 }

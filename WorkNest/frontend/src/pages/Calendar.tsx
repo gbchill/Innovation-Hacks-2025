@@ -1,6 +1,15 @@
-// src/pages/Calendar.tsx
 import React, { useState, useEffect, useRef } from 'react'
+import {
+  getCalendarEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+  CalendarEvent,
+} from '../services/calendarSupabase'
 
+/* ────────────────────────────────────────
+   Front‑end shape (camelCase)
+   ──────────────────────────────────────── */
 interface Event {
   id: string
   title: string
@@ -11,7 +20,32 @@ interface Event {
   isDeepWork?: boolean
 }
 
+/* Helper to translate DB ↔ front‑end -------------------------- */
+const dbToEvent = (db: CalendarEvent): Event => ({
+  id: db.id,
+  title: db.title,
+  dayIndex: db.day_index,
+  startTime: db.start_time,
+  endTime: db.end_time,
+  color: db.color,
+  isDeepWork: db.is_deep_work ?? false,
+})
+
+const eventToDb = (
+  ev: Event,
+  weekIndex: number,
+): Omit<CalendarEvent, 'id' | 'created_at'> => ({
+  title: ev.title,
+  day_index: ev.dayIndex,
+  start_time: ev.startTime,
+  end_time: ev.endTime,
+  color: ev.color,
+  is_deep_work: ev.isDeepWork ?? false,
+  week_index: weekIndex,
+})
+
 export default function Calendar() {
+  /* ------------------------- static calendar scaffold ------------------------ */
   const weeks = [
     [
       { date: 14, day: 'Sun' }, { date: 15, day: 'Mon' }, { date: 16, day: 'Tue' },
@@ -45,6 +79,7 @@ export default function Calendar() {
   const timeSlots = generateTimeSlots()
   const slotHeight = 32
 
+  /* ----------------------------- component state ----------------------------- */
   const [weekIndex, setWeekIndex] = useState(0)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<Event[]>([])
@@ -68,7 +103,21 @@ export default function Calendar() {
 
   const calendarRef = useRef<HTMLDivElement>(null)
 
-  // “Now” line
+  /* -------------------------- fetch events for the week ---------------------- */
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const dbEvents = await getCalendarEvents(weekIndex /*, userId */)
+        if (mounted) setEvents(dbEvents.map(dbToEvent))
+      } catch (err) {
+        console.error('Failed to load calendar events', err)
+      }
+    })()
+    return () => { mounted = false }
+  }, [weekIndex])
+
+  /* -------------------------- "Now" red line position ------------------------ */
   const [nowPos, setNowPos] = useState(0)
   useEffect(() => {
     const updateNow = () => {
@@ -81,9 +130,9 @@ export default function Calendar() {
     return () => clearInterval(id)
   }, [])
 
-  // DeepWork event listener
+  /* --------------------------- deep‑work event hook -------------------------- */
   useEffect(() => {
-    const handler = (e: CustomEvent<{ start: Date; end: Date }>) => {
+    const handler = async (e: CustomEvent<{ start: Date; end: Date }>) => {
       const { start, end } = e.detail
       const col = weeks[weekIndex].findIndex(d => d.date === start.getDate())
       const fmt = (d: Date) => {
@@ -94,31 +143,41 @@ export default function Calendar() {
         if (h === 0) h = 12
         return `${h}:${m} ${pm ? 'PM' : 'AM'}`
       }
-      setEvents(evts => [
-        ...evts,
-        {
-          id: Date.now().toString(),
-          title: 'Deep Work',
-          dayIndex: col >= 0 ? col : 0,
-          startTime: fmt(start),
-          endTime: fmt(end),
-          color: '#FF7043',
-          isDeepWork: true,
-        },
-      ])
+
+      /* save in DB then local state */
+      try {
+        const saved = await createCalendarEvent({
+          ...eventToDb(
+            {
+              id: '',
+              title: 'Deep Work',
+              dayIndex: col >= 0 ? col : 0,
+              startTime: fmt(start),
+              endTime: fmt(end),
+              color: '#FF7043',
+              isDeepWork: true,
+            },
+            weekIndex,
+          ),
+        })
+        setEvents(evts => [...evts, dbToEvent(saved)])
+      } catch (err) {
+        console.error('Failed to create Deep Work event', err)
+      }
     }
+
     window.addEventListener('deepworkEvent', handler as any)
     return () => window.removeEventListener('deepworkEvent', handler as any)
   }, [weekIndex])
 
-  // Update current date when week changes
+  /* --------------- update current date label when week changes -------------- */
   useEffect(() => {
     const d = new Date()
     d.setDate(d.getDate() + weekIndex * 7)
     setCurrentDate(d)
   }, [weekIndex])
 
-  // Helpers
+  /* ------------------------------- helpers ---------------------------------- */
   const isToday = (date: number) => {
     const t = new Date()
     return (
@@ -127,6 +186,7 @@ export default function Calendar() {
       currentDate.getFullYear() === t.getFullYear()
     )
   }
+
   const timeToPosition = (time: string) => {
     const [tp, period] = time.split(' ')
     let [h, m] = tp.split(':').map(Number)
@@ -134,7 +194,7 @@ export default function Calendar() {
     return ((h * 60 + m) / 30) * slotHeight
   }
 
-  // Create / edit handlers
+  /* --------------------------- CRUD handlers -------------------------------- */
   const handleTimeSlotClick = (dayIndex: number, timeIdx: number) => {
     const start = timeSlots[timeIdx]
     const end = timeSlots[Math.min(timeIdx + 2, timeSlots.length - 1)]
@@ -149,37 +209,69 @@ export default function Calendar() {
     setIsEditing(true)
   }
 
-  const handleCreateEvent = () => {
+  const handleCreateEvent = async () => {
     const title = newEvent.isDeepWork ? 'Deep Work' : newEvent.title.trim()
     if (!title) return
     const color = newEvent.isDeepWork ? '#FF7043' : newEvent.color
-    setEvents(evts => [
-      ...evts,
-      { id: Date.now().toString(), ...newEvent, title, color },
-    ])
-    setIsEditing(false)
+
+    try {
+      const saved = await createCalendarEvent(
+        eventToDb(
+          {
+            id: '',
+            title,
+            dayIndex: newEvent.dayIndex,
+            startTime: newEvent.startTime,
+            endTime: newEvent.endTime,
+            color,
+            isDeepWork: newEvent.isDeepWork,
+          },
+          weekIndex,
+        ),
+      )
+      setEvents(evts => [...evts, dbToEvent(saved)])
+      setIsEditing(false)
+    } catch (err) {
+      console.error('Error creating calendar event', err)
+    }
+  }
+
+  const handleUpdateEvent = async () => {
+    if (!selectedEvent) return
+    try {
+      const updated = await updateCalendarEvent(
+        selectedEvent.id,
+        eventToDb(selectedEvent, weekIndex),
+      )
+      setEvents(evts =>
+        evts.map(ev => (ev.id === updated.id ? dbToEvent(updated) : ev)),
+      )
+      setSelectedEvent(null)
+    } catch (err) {
+      console.error('Error updating calendar event', err)
+    }
+  }
+
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent) return
+    try {
+      await deleteCalendarEvent(selectedEvent.id)
+      setEvents(evts => evts.filter(ev => ev.id !== selectedEvent.id))
+      setSelectedEvent(null)
+    } catch (err) {
+      console.error('Error deleting event', err)
+    }
   }
 
   const handleEventClick = (ev: Event, e: React.MouseEvent) => {
     e.stopPropagation()
     setSelectedEvent(ev)
   }
-  const handleUpdateEvent = () => {
-    if (!selectedEvent) return
-    setEvents(evts =>
-      evts.map(ev => (ev.id === selectedEvent.id ? selectedEvent : ev))
-    )
-    setSelectedEvent(null)
-  }
-  const handleDeleteEvent = () => {
-    if (!selectedEvent) return
-    setEvents(evts => evts.filter(ev => ev.id !== selectedEvent.id))
-    setSelectedEvent(null)
-  }
+
   const handleTimeChange = (
     time: string,
     isStart: boolean,
-    type: 'new' | 'existing'
+    type: 'new' | 'existing',
   ) => {
     if (type === 'new') {
       setNewEvent(ne => ({
@@ -194,6 +286,7 @@ export default function Calendar() {
     }
   }
 
+  /* ---------------------- renderer helpers (unchanged) ---------------------- */
   const renderEvents = (dayIdx: number) =>
     events
       .filter(ev => ev.dayIndex === dayIdx)
@@ -243,23 +336,23 @@ export default function Calendar() {
     children: React.ReactNode
     title: string
   }) => (
-    <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+    <div className="bg-[#242424] rounded-xl shadow-xl w-full max-w-md text-white">
       <div className="p-6">
-        <h2 className="text-2xl font-bold text-[#1B3B29] mb-6">{title}</h2>
+        <h2 className="text-2xl font-bold text-white mb-6">{title}</h2>
         {children}
       </div>
     </div>
   )
 
   return (
-    <div className="bg-[#F7F5EF] min-h-screen p-4 md:p-8">
+    <div className="bg-[#181414] min-h-screen p-4 md:p-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
         <div className="mb-4 md:mb-0">
-          <h1 className="text-3xl md:text-4xl font-bold text-[#1B3B29] mb-1">
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-1">
             Weekly Calendar
           </h1>
-          <p className="text-md text-[#5F6368]">
+          <p className="text-md text-gray-300">
             {currentDate.toLocaleDateString('en-US', {
               month: 'long',
               year: 'numeric',
@@ -270,20 +363,20 @@ export default function Calendar() {
           <button
             onClick={() => setWeekIndex(w => Math.max(0, w - 1))}
             disabled={weekIndex === 0}
-            className="px-4 py-2 bg-white text-[#1B3B29] border rounded-lg disabled:opacity-50"
+            className="px-4 py-2 bg-[#242424] text-white border border-gray-700 rounded-lg disabled:opacity-50"
           >
             ← Previous
           </button>
           <button
             onClick={() => setWeekIndex(0)}
-            className="px-4 py-2 bg-white text-[#1B3B29] border rounded-lg"
+            className="px-4 py-2 bg-[#242424] text-white border border-gray-700 rounded-lg"
           >
             Today
           </button>
           <button
             onClick={() => setWeekIndex(w => Math.min(weeks.length - 1, w + 1))}
             disabled={weekIndex === weeks.length - 1}
-            className="px-4 py-2 bg-white text-[#1B3B29] border rounded-lg disabled:opacity-50"
+            className="px-4 py-2 bg-[#242424] text-white border border-gray-700 rounded-lg disabled:opacity-50"
           >
             Next →
           </button>
@@ -292,23 +385,23 @@ export default function Calendar() {
 
       {/* Calendar Grid */}
       <div
-        className="border rounded-lg overflow-hidden shadow-sm bg-[#F7F5EF] relative"
+        className="border border-gray-700 rounded-lg overflow-hidden shadow-sm bg-[#181414] relative"
         ref={calendarRef}
       >
         {/* Header Row */}
-        <div className="grid grid-cols-8 bg-[#FAFAFA]">
-          <div className="border-r border-b border-[#E0E0E0]" />
+        <div className="grid grid-cols-8 bg-[#242424]">
+          <div className="border-r border-b border-gray-700" />
           {weeks[weekIndex].map((d, i) => (
             <div
               key={i}
-              className={`p-2 border-b border-[#E0E0E0] text-center ${
-                isToday(d.date) ? 'bg-[#E6F4EA]' : ''
+              className={`p-2 border-b border-gray-700 text-center ${
+                isToday(d.date) ? 'bg-[#1B3B29]' : ''
               }`}
             >
-              <div className="text-sm font-medium text-[#70757A]">{d.day}</div>
+              <div className="text-sm font-medium text-gray-300">{d.day}</div>
               <div
                 className={`mt-1 w-8 h-8 flex items-center justify-center mx-auto rounded-full ${
-                  isToday(d.date) ? 'bg-[#1B3B29] text-white' : 'text-[#3C4043]'
+                  isToday(d.date) ? 'bg-[#1B3B29] text-white' : 'text-white'
                 }`}
               >
                 {d.date}
@@ -324,10 +417,10 @@ export default function Calendar() {
             {timeSlots.map((slot, idx) => (
               <div
                 key={idx}
-                className="h-8 border-r border-[#E0E0E0] flex items-center justify-end pr-2 bg-[#F7F5EF]"
+                className="h-8 border-r border-gray-700 flex items-center justify-end pr-2 bg-[#181414]"
               >
                 {idx % 2 === 0 && (
-                  <span className="text-xs text-[#70757A]">{slot}</span>
+                  <span className="text-xs text-gray-400">{slot}</span>
                 )}
               </div>
             ))}
@@ -339,7 +432,7 @@ export default function Calendar() {
               {timeSlots.map((_, tIdx) => (
                 <div
                   key={tIdx}
-                  className="h-8 border-b border-[#E0E0E0] hover:bg-[#EDECE8] cursor-pointer bg-[#F7F5EF]"
+                  className="h-8 border-b border-gray-700 hover:bg-[#242424] cursor-pointer bg-[#181414]"
                   onClick={() => handleTimeSlotClick(dayIdx, tIdx)}
                 />
               ))}
@@ -347,7 +440,7 @@ export default function Calendar() {
             </div>
           ))}
 
-          {/* “Now” line */}
+          {/* "Now" line */}
           {weekIndex === 0 && (
             <div
               className="absolute bg-red-500 h-[2px] z-10"
@@ -368,7 +461,7 @@ export default function Calendar() {
             <div className="space-y-4">
               {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Title
                 </label>
                 <input
@@ -377,9 +470,9 @@ export default function Calendar() {
                   disabled={newEvent.isDeepWork}
                   className={`w-full p-2 border rounded-lg focus:ring-2 ${
                     newEvent.isDeepWork
-                      ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
-                      : 'focus:ring-[#1B3B29]'
-                  }`}
+                      ? 'bg-gray-700 border-gray-700 cursor-not-allowed'
+                      : 'bg-[#242424] border-gray-700 focus:ring-[#1B3B29]'
+                  } text-white`}
                   value={newEvent.title}
                   onChange={e => setNewEvent(ne => ({ ...ne, title: e.target.value }))}
                 />
@@ -387,11 +480,11 @@ export default function Calendar() {
               {/* Start & End */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Start Time
                   </label>
                   <select
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-700 rounded-lg bg-[#242424] text-white"
                     value={newEvent.startTime}
                     onChange={e => handleTimeChange(e.target.value, true, 'new')}
                   >
@@ -401,11 +494,11 @@ export default function Calendar() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     End Time
                   </label>
                   <select
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-700 rounded-lg bg-[#242424] text-white"
                     value={newEvent.endTime}
                     onChange={e => handleTimeChange(e.target.value, false, 'new')}
                   >
@@ -423,14 +516,14 @@ export default function Calendar() {
               </div>
               {/* Color */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Event Color
                 </label>
                 <input
                   type="color"
                   value={newEvent.color}
                   onChange={e => setNewEvent(ne => ({ ...ne, color: e.target.value }))}
-                  className="w-12 h-8 p-0 border-0"
+                  className="w-12 h-8 p-0 border-0 bg-transparent"
                 />
               </div>
               {/* Deep Work */}
@@ -439,20 +532,20 @@ export default function Calendar() {
                   type="checkbox"
                   checked={newEvent.isDeepWork}
                   onChange={e => setNewEvent(ne => ({ ...ne, isDeepWork: e.target.checked }))}
-                  className="h-4 w-4 text-[#FF7043] rounded"
+                  className="h-4 w-4 text-[#FF7043] rounded bg-[#242424]"
                 />
-                <span className="text-sm">Deep Work?</span>
+                <span className="text-sm text-gray-300">Deep Work?</span>
               </label>
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4">
                 <button
-                  className="px-4 py-2 border rounded-lg text-[#5F6368]"
+                  className="px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-[#1a1a1a]"
                   onClick={() => setIsEditing(false)}
                 >
                   Cancel
                 </button>
                 <button
-                  className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg"
+                  className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg hover:bg-[#152b1f]"
                   onClick={handleCreateEvent}
                 >
                   Create Event
@@ -470,7 +563,7 @@ export default function Calendar() {
             <div className="space-y-4">
               {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Title
                 </label>
                 <input
@@ -479,9 +572,9 @@ export default function Calendar() {
                   disabled={!!selectedEvent.isDeepWork}
                   className={`w-full p-2 border rounded-lg focus:ring-2 ${
                     selectedEvent.isDeepWork
-                      ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
-                      : 'focus:ring-[#1B3B29]'
-                  }`}
+                      ? 'bg-gray-700 border-gray-700 cursor-not-allowed'
+                      : 'bg-[#242424] border-gray-700 focus:ring-[#1B3B29]'
+                  } text-white`}
                   value={selectedEvent.title}
                   onChange={e => setSelectedEvent(se => se && ({ ...se, title: e.target.value }))}
                 />
@@ -489,11 +582,11 @@ export default function Calendar() {
               {/* Start & End */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Start Time
                   </label>
                   <select
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-700 rounded-lg bg-[#242424] text-white"
                     value={selectedEvent.startTime}
                     onChange={e => handleTimeChange(e.target.value, true, 'existing')}
                   >
@@ -501,11 +594,11 @@ export default function Calendar() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     End Time
                   </label>
                   <select
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-2 border border-gray-700 rounded-lg bg-[#242424] text-white"
                     value={selectedEvent.endTime}
                     onChange={e => handleTimeChange(e.target.value, false, 'existing')}
                   >
@@ -523,14 +616,14 @@ export default function Calendar() {
               </div>
               {/* Color */}
               <div>
-                <label className="block text-sm font-medium text-[#5F6368] mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Event Color
                 </label>
                 <input
                   type="color"
                   value={selectedEvent.color}
                   onChange={e => setSelectedEvent(se => se && ({ ...se, color: e.target.value }))}
-                  className="w-12 h-8 p-0 border-0"
+                  className="w-12 h-8 p-0 border-0 bg-transparent"
                 />
               </div>
               {/* Deep Work */}
@@ -539,27 +632,27 @@ export default function Calendar() {
                   type="checkbox"
                   checked={!!selectedEvent.isDeepWork}
                   onChange={e => setSelectedEvent(se => se && ({ ...se, isDeepWork: e.target.checked }))}
-                  className="h-4 w-4 text-[#FF7043] rounded"
+                  className="h-4 w-4 text-[#FF7043] rounded bg-[#242424]"
                 />
-                <span className="text-sm">Deep Work?</span>
+                <span className="text-sm text-gray-300">Deep Work?</span>
               </label>
               {/* Actions */}
               <div className="flex justify-between pt-4">
                 <button
-                  className="px-4 py-2 text-red-600 border rounded-lg"
+                  className="px-4 py-2 text-red-500 border border-gray-700 rounded-lg hover:bg-[#2a2020]"
                   onClick={handleDeleteEvent}
                 >
                   Delete
                 </button>
                 <div className="flex gap-3">
                   <button
-                    className="px-4 py-2 border rounded-lg text-[#5F6368]"
+                    className="px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-[#1a1a1a]"
                     onClick={() => setSelectedEvent(null)}
                   >
                     Cancel
                   </button>
                   <button
-                    className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg"
+                    className="px-4 py-2 bg-[#1B3B29] text-white rounded-lg hover:bg-[#152b1f]"
                     onClick={handleUpdateEvent}
                   >
                     Save Changes
