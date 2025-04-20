@@ -8,7 +8,6 @@ import BrowserPage from "./pages/BrowserPage";
 import Calendar from "./pages/Calendar";
 import Tasks from "./pages/Tasks";
 import DeepWork from "./pages/DeepWork";
-import FocusTimer from "./components/common/FocusTimer";
 import AnimatedLoop from "./components/common/AnimatedLoop";
 
 /* -------------  keep numbers in sync with Sidebar.tsx ------------- */
@@ -18,12 +17,14 @@ const SIDEBAR_COLLAPSED = 64; // w-20 (5rem) ←‑ wider rail
 function App() {
   const [started, setStarted] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
 
-  const toggleColorScheme = () => setIsDarkMode((prev) => !prev);
   const handleSidebarToggle = (collapsed: boolean) =>
     setSidebarCollapsed(collapsed);
+  
+  const handleTimerRunning = (isRunning: boolean) => {
+    setTimerActive(isRunning);
+  };
 
   const sidebarWidth = sidebarCollapsed
     ? SIDEBAR_COLLAPSED
@@ -38,7 +39,7 @@ function App() {
       {/* Background animation tied to focus timer */}
       <AnimatedLoop show={timerActive} />
 
-      <div className="flex h-screen w-screen overflow-hidden bg-[#F7F5EF]">
+      <div className="flex h-screen w-screen overflow-hidden bg-[#181414]">
         {/* Sidebar */}
         <div
           className="z-20 h-full overflow-hidden transition-all duration-300"
@@ -46,18 +47,12 @@ function App() {
         >
           <Sidebar
             onToggle={handleSidebarToggle}
-            isDarkMode={isDarkMode}
-            toggleColorScheme={toggleColorScheme}
+            onTimerRunning={handleTimerRunning}
           />
         </div>
 
         {/* Main content */}
         <div className="flex-1 overflow-hidden relative">
-          {/* Top‑right floating Focus Timer */}
-          <div className="absolute top-4 right-4 z-30">
-            <FocusTimer onTimerRunning={setTimerActive} />
-          </div>
-
           <Routes>
             <Route
               path="/"
@@ -65,7 +60,6 @@ function App() {
                 <BrowserPage
                   sidebarWidth={sidebarWidth}
                   sidebarCollapsed={sidebarCollapsed}
-                  isDarkMode={isDarkMode}
                 />
               }
             />

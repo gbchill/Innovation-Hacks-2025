@@ -21,7 +21,9 @@ const fullViewData: Record<AllColumnId, Column> = {
 };
 
 const InteractiveTodo: React.FC = () => {
-  const [columns, setColumns] = useState(fullViewData);
+  const [columns, setColumns] = useState<Record<AllColumnId, Column>>(
+    () => ({ ...fullViewData })
+  );
   const [newTask, setNewTask] = useState('');
   const [targetColumn, setTargetColumn] = useState<ColumnId>('todo');
   const [taskIdCounter, setTaskIdCounter] = useState(1);
@@ -31,11 +33,9 @@ const InteractiveTodo: React.FC = () => {
   const [modalName, setModalName] = useState('');
   const [modalPriority, setModalPriority] = useState<ColumnId>('todo');
 
-  // Decompose button loading
+  // AI & Decompose loading states
   const [decomposing, setDecomposing] = useState<string | null>(null);
-  // AI‑sort loading
   const [sortingCol, setSortingCol] = useState<AllColumnId | null>(null);
-  // AI‑suggest priority loading
   const [suggesting, setSuggesting] = useState(false);
 
   // ─── Basic handlers ────────────────────────────────────────────────────
@@ -77,6 +77,7 @@ const InteractiveTodo: React.FC = () => {
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination) return;
+
     const fromKey = source.droppableId as AllColumnId;
     const toKey   = destination.droppableId as AllColumnId;
 
@@ -102,6 +103,7 @@ const InteractiveTodo: React.FC = () => {
     setModalName(task.content);
     if (columnId !== 'completed') setModalPriority(columnId as ColumnId);
   };
+
   const closeModal = () => setModalTask(null);
 
   const handleSave = () => {
@@ -111,6 +113,7 @@ const InteractiveTodo: React.FC = () => {
 
     setColumns(prev => {
       if (modalPriority === columnId) {
+        // Same column: update content
         return {
           ...prev,
           [columnId]: {
@@ -121,6 +124,7 @@ const InteractiveTodo: React.FC = () => {
           },
         };
       }
+      // Different column: remove from old, add to new
       return {
         ...prev,
         [columnId]: {
@@ -133,6 +137,7 @@ const InteractiveTodo: React.FC = () => {
         },
       };
     });
+
     closeModal();
   };
 
