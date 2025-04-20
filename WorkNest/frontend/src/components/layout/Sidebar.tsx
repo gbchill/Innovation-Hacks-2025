@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Logo from "/logo.png";
 
@@ -9,13 +9,28 @@ const menuItems = [
   { name: "Deep Work", path: "/deepwork" },
 ];
 
-function Sidebar() {
+interface SidebarProps {
+  onToggle?: (collapsed: boolean) => void;
+}
+
+function Sidebar({ onToggle }: SidebarProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
   const toggleSidebar = () => {
-    setCollapsed(!collapsed);
+    const newCollapsedState = !collapsed;
+    setCollapsed(newCollapsedState);
+    if (onToggle) {
+      onToggle(newCollapsedState);
+    }
   };
+
+  // Call onToggle on initial render to set correct initial state
+  useEffect(() => {
+    if (onToggle) {
+      onToggle(collapsed);
+    }
+  }, []);
 
   return (
     <div className="relative h-full">
@@ -31,7 +46,6 @@ function Sidebar() {
               <img src={Logo} alt="WorkNest Logo" className="w-12 h-12 rounded-full shadow-sm" />
               <h2 className="text-3xl font-bold text-[#1B3B29] tracking-wide">WorkNest</h2>
             </div>
-
             <nav className="flex flex-col gap-4">
               {menuItems.map((item) => (
                 <Link
@@ -50,12 +64,11 @@ function Sidebar() {
           </>
         )}
       </div>
-
       {/* Tiny Tab Toggle Button */}
       <button
         onClick={toggleSidebar}
-        className="absolute top-6 -right-5 w-10 h-10 rounded-r-full bg-[#1B3B29] text-white flex items-center justify-center 
-                  shadow-md hover:bg-[#145A32] active:scale-90 transition-all duration-300"
+        className="absolute top-6 -right-5 w-10 h-10 rounded-r-full bg-[#1B3B29] text-white flex items-center justify-center
+         shadow-md hover:bg-[#145A32] active:scale-90 transition-all duration-300 z-20"
         title={collapsed ? "Open Sidebar" : "Close Sidebar"}
       >
         {collapsed ? "➔" : "←"}
