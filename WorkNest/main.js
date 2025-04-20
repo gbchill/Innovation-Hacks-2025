@@ -1,6 +1,14 @@
 // main.js
+require('dotenv').config();                          // ← load .env before anything else
+
 const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
 const path = require('path');
+const { GoogleGenAI } = require('@google/genai');     // ← require the GenAI client
+
+// Instantiate the AI client with your key from .env
+const aiClient = new GoogleGenAI({
+  apiKey: process.env.GOOGLE_API_KEY
+});
 
 // Disable GPU/WebGPU to suppress warnings
 app.disableHardwareAcceleration();
@@ -41,6 +49,21 @@ function createWindow() {
 
   mainWindow.loadURL('http://localhost:5173');
 }
+
+// -- AI GENERATION HANDLER ----------------------------------------
+ipcMain.handle('ai-generate', async (_event, prompt) => {
+  try {
+    const response = await aiClient.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: prompt,
+    });
+    return { text: response.text };
+  } catch (err) {
+    console.error('AI generate error:', err);
+    return { error: err.message };
+  }
+});
+// -----------------------------------------------------------------
 
 function applyLightMode() {
   if (!browserView) return;

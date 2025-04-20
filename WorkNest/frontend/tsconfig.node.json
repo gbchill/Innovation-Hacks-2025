@@ -1,24 +1,24 @@
 {
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
-    "target": "ES2022",
-    "lib": ["ES2023"],
-    "module": "ESNext",
-    "skipLibCheck": true,
+    "target": "ES2022",                       // Use ES2022 for Node.js features
+    "lib": ["ES2023"],                         // Add latest ES2023 features
+    "module": "ESNext",                        // Use ESNext for modern module support
+    "skipLibCheck": true,                      // Skip type checking of declaration files
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
+    /* Bundler mode settings */
+    "moduleResolution": "bundler",             // Resolve imports as Webpack or other bundlers would
+    "allowImportingTsExtensions": true,        // Allow `.ts` extensions to be used in imports
+    "isolatedModules": true,                   // Enable isolated modules for Node.js
+    "moduleDetection": "force",                // Force module detection for compatibility
+    "noEmit": true,                            // No actual file emission; type-check only
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    /* Linting-related strict settings */
+    "strict": true,                            // Enable strict type checking
+    "noUnusedLocals": true,                    // Catch unused variables in Node.js code
+    "noUnusedParameters": true,                // Catch unused function parameters
+    "noFallthroughCasesInSwitch": true,        // Prevent fall-through cases in switch statements
+    "noUncheckedSideEffectImports": true       // Catch side-effect imports in Node.js code
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts"]               // Only include `vite.config.ts` in Node.js config
 }
