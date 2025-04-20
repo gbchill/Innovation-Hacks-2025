@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-
 import Sidebar from "./components/layout/Sidebar";
 import WelcomeScreen from "./components/common/WelcomeScreen";
 import BrowserPage from "./pages/BrowserPage";
@@ -16,6 +15,7 @@ function App() {
   const [timerActive, setTimerActive] = useState(false);
   const sidebarWidth = 256; // 16rem or 256px for w-64
 
+  // If app hasn't been started yet, show welcome screen
   if (!started) {
     return <WelcomeScreen onGetStarted={() => setStarted(true)} />;
   }
@@ -28,23 +28,34 @@ function App() {
     <Router>
       {/* Background animation tied to focus timer */}
       <AnimatedLoop show={timerActive} />
-
+      
       <div className="flex h-screen w-screen overflow-hidden bg-[#F7F5EF] relative z-10">
         {/* Sidebar */}
-        <div className="z-20 h-full" style={{ width: sidebarCollapsed ? '0' : `${sidebarWidth}px` }}>
+        <div 
+          className="z-20 h-full transition-all duration-300" 
+          style={{ width: sidebarCollapsed ? '0' : `${sidebarWidth}px` }}
+        >
           <Sidebar onToggle={handleSidebarToggle} />
         </div>
-
+        
         {/* Main content area */}
         <div className="flex-1 overflow-hidden relative">
           {/* Top-right floating Focus Timer */}
           <div className="absolute top-4 right-4 z-30">
             <FocusTimer onTimerRunning={setTimerActive} />
           </div>
-
+          
           {/* Routes */}
           <Routes>
-            <Route path="/" element={<BrowserPage sidebarWidth={sidebarWidth} sidebarCollapsed={sidebarCollapsed} />} />
+            <Route 
+              path="/" 
+              element={
+                <BrowserPage 
+                  sidebarWidth={sidebarWidth} 
+                  sidebarCollapsed={sidebarCollapsed} 
+                />
+              } 
+            />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/deepwork" element={<DeepWork />} />

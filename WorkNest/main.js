@@ -3,6 +3,7 @@ const path = require('path');
 
 let mainWindow;
 let browserView;
+let currentUrl = 'https://www.google.com';
 
 function createWindow() {
   // Create the main application window
@@ -25,6 +26,11 @@ function createWindow() {
 
 // Create browser view when requested by the renderer
 ipcMain.on('create-browser-view', (event, url, sidebarWidth = 0) => {
+  // Save current URL if provided
+  if (url) {
+    currentUrl = url;
+  }
+
   // Create browser view if it doesn't exist yet
   if (!browserView) {
     browserView = new BrowserView({
@@ -42,13 +48,13 @@ ipcMain.on('create-browser-view', (event, url, sidebarWidth = 0) => {
   const bounds = mainWindow.getBounds();
   browserView.setBounds({ 
     x: sidebarWidth, 
-    y: 70, // Leave space for controls at top
+    y: 100, // Leave more space for tab bar and controls at top
     width: bounds.width - sidebarWidth, 
-    height: bounds.height - 70 
+    height: bounds.height - 100 
   });
   
   // Navigate to the URL
-  browserView.webContents.loadURL(url || 'https://www.google.com');
+  browserView.webContents.loadURL(currentUrl);
   
   // Send back the browserView ID to the renderer
   event.reply('browser-view-created', browserView.id);
@@ -60,10 +66,18 @@ ipcMain.on('create-browser-view', (event, url, sidebarWidth = 0) => {
       const currentBounds = browserView.getBounds();
       browserView.setBounds({ 
         x: currentBounds.x, // Keep the current X position (for sidebar)
-        y: 70,
+        y: 100, // Keep space for tabs and controls
         width: bounds.width - currentBounds.x, 
-        height: bounds.height - 70 
+        height: bounds.height - 100 
       });
+    }
+  });
+  
+  // Listen for page title updates
+  browserView.webContents.on('page-title-updated', (event, title) => {
+    // Send the title back to the renderer
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('page-title-updated', title);
     }
   });
 });
@@ -74,9 +88,9 @@ ipcMain.on('update-browser-view-bounds', (event, sidebarWidth = 0) => {
     const bounds = mainWindow.getBounds();
     browserView.setBounds({ 
       x: sidebarWidth, 
-      y: 70,
+      y: 100, // Keep space for tabs and controls
       width: bounds.width - sidebarWidth, 
-      height: bounds.height - 70 
+      height: bounds.height - 100 
     });
   }
 });
@@ -102,6 +116,7 @@ ipcMain.on('browser-reload', () => {
 
 ipcMain.on('browser-navigate', (event, url) => {
   if (browserView) {
+    currentUrl = url; // Save the current URL
     browserView.webContents.loadURL(url);
   }
 });
@@ -110,7 +125,7 @@ ipcMain.on('get-current-url', (event) => {
   if (browserView) {
     event.reply('current-url', browserView.webContents.getURL());
   } else {
-    event.reply('current-url', '');
+    event.reply('current-url', currentUrl);
   }
 });
 
@@ -127,7 +142,7 @@ ipcMain.on('get-navigation-state', (event) => {
       canGoBack: false,
       canGoForward: false,
       isLoading: false,
-      currentUrl: ''
+      currentUrl: currentUrl
     });
   }
 });
