@@ -1,26 +1,26 @@
 {
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
+    "target": "ES2020",                       // Using ES2020 for better async/await support
+    "useDefineForClassFields": true,           // Ensures class fields work as expected
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],  // Add libraries for ES2020 and DOM
+    "module": "ESNext",                        // Use ESNext modules for modern module resolution
+    "skipLibCheck": true,                      // Skip checking of declaration files for faster builds
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
+    /* Bundler mode settings */
+    "moduleResolution": "bundler",             // Set bundler mode to resolve imports like Webpack
+    "allowImportingTsExtensions": true,        // Allow importing `.ts` extensions (e.g., `import './file.ts'`)
+    "isolatedModules": true,                   // Enable isolated modules for faster compilation
+    "moduleDetection": "force",                // Force module detection
+    "noEmit": true,                            // Disable output of `.js` files; only type-checking
+    "jsx": "react-jsx",                       // Use React JSX transformation
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    /* Linting-related strict settings */
+    "strict": true,                            // Enable strict type checking
+    "noUnusedLocals": true,                    // Catch unused variables
+    "noUnusedParameters": true,                // Catch unused function parameters
+    "noFallthroughCasesInSwitch": true,        // Prevent fall-through cases in switch statements
+    "noUncheckedSideEffectImports": true       // Warn if importing files with side effects
   },
-  "include": ["src"]
+  "include": ["src"]                           // Include all `.ts` files in the `src` directory
 }
