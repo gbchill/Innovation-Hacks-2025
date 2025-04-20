@@ -14,11 +14,15 @@
   "type": "commonjs",
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.4",
+    "@types/react-beautiful-dnd": "^13.1.8",
     "autoprefixer": "^10.4.21",
     "electron": "^35.2.0",
     "npm-run-all": "^4.1.5",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.4",
     "wait-on": "^8.0.3"
+  },
+  "dependencies": {
+    "react-beautiful-dnd": "^13.1.1"
   }
 }
