@@ -21,24 +21,20 @@ const fullViewData: Record<AllColumnId, Column> = {
 };
 
 const InteractiveTodo: React.FC = () => {
-  const [columns, setColumns] = useState<Record<AllColumnId, Column>>(
-    () => ({ ...fullViewData })
-  );
+  const [columns, setColumns] = useState<Record<AllColumnId, Column>>(() => ({ ...fullViewData }));
   const [newTask, setNewTask] = useState('');
   const [targetColumn, setTargetColumn] = useState<ColumnId>('todo');
   const [taskIdCounter, setTaskIdCounter] = useState(1);
 
-  // Modal state
   const [modalTask, setModalTask] = useState<{ task: Task; columnId: AllColumnId } | null>(null);
   const [modalName, setModalName] = useState('');
   const [modalPriority, setModalPriority] = useState<ColumnId>('todo');
 
-  // AI & Decompose loading states
   const [decomposing, setDecomposing] = useState<string | null>(null);
   const [sortingCol, setSortingCol] = useState<AllColumnId | null>(null);
   const [suggesting, setSuggesting] = useState(false);
 
-  // ─── Basic handlers ────────────────────────────────────────────────────
+  // ─── Handlers ───────────────────────────────────────────────────────────
   const handleAddTask = () => {
     if (!newTask.trim()) return;
     const newObj: Task = { id: `task-${taskIdCounter}`, content: newTask };
@@ -97,13 +93,12 @@ const InteractiveTodo: React.FC = () => {
   };
   // ────────────────────────────────────────────────────────────────────────
 
-  // ─── Task Edit Modal ───────────────────────────────────────────────────
+  // ─── Edit Modal ────────────────────────────────────────────────────────
   const openEditModal = (task: Task, columnId: AllColumnId) => {
     setModalTask({ task, columnId });
     setModalName(task.content);
     if (columnId !== 'completed') setModalPriority(columnId as ColumnId);
   };
-
   const closeModal = () => setModalTask(null);
 
   const handleSave = () => {
@@ -113,7 +108,7 @@ const InteractiveTodo: React.FC = () => {
 
     setColumns(prev => {
       if (modalPriority === columnId) {
-        // Same column: update content
+        // same column
         return {
           ...prev,
           [columnId]: {
@@ -124,7 +119,7 @@ const InteractiveTodo: React.FC = () => {
           },
         };
       }
-      // Different column: remove from old, add to new
+      // move to new column
       return {
         ...prev,
         [columnId]: {
@@ -141,7 +136,6 @@ const InteractiveTodo: React.FC = () => {
     closeModal();
   };
 
-  // AI‑Suggest Priority in Modal
   const handleAISuggestPriority = async () => {
     if (!modalTask) return;
     const api: any = window.electronAPI;
@@ -154,110 +148,30 @@ const InteractiveTodo: React.FC = () => {
         `Return just one of: High, Medium, or Low.`,
         `Task: "${modalName}"`
       ].join('\n');
-
       const { text } = await api.generateAI(prompt);
       const choice = text.trim().toLowerCase();
       if (choice.startsWith('high')) setModalPriority('todo');
       else if (choice.startsWith('medium')) setModalPriority('doing');
-      else if (choice.startsWith('low')) setModalPriority('done');
+      else setModalPriority('done');
     } finally {
       setSuggesting(false);
     }
   };
   // ────────────────────────────────────────────────────────────────────────
 
-  // AI‑Sort Column
-  const handleAISort = async (colId: AllColumnId) => {
-    const api: any = window.electronAPI;
-    if (!api?.generateAI) return;
-
-    setSortingCol(colId);
-    try {
-      const tasks = columns[colId].tasks.map(t => t.content).join(', ');
-      const prompt = [
-        `Reorder these tasks by priority (highest first).`,
-        `Return a comma-separated list in the new order.`,
-        `Tasks: ${tasks}`
-      ].join('\n');
-
-      const { text } = await api.generateAI(prompt);
-      const ordered = text.split(',').map(s => s.trim()).filter(s => s);
-
-      // build new tasks array by matching content
-      const newTasks = ordered
-        .map(content => columns[colId].tasks.find(t => t.content === content))
-        .filter((t): t is Task => Boolean(t));
-      // append any that AI missed
-      columns[colId].tasks.forEach(t => {
-        if (!newTasks.find(nt => nt.id === t.id)) newTasks.push(t);
-      });
-
-      setColumns(prev => ({
-        ...prev,
-        [colId]: { ...prev[colId], tasks: newTasks }
-      }));
-    } finally {
-      setSortingCol(null);
-    }
-  };
-  // ────────────────────────────────────────────────────────────────────────
-
-  // AI Decompose Handler
-  const handleDecompose = async (colId: AllColumnId, task: Task) => {
-    const api: any = window.electronAPI;
-    if (!api?.generateAI) return;
-
-    setDecomposing(task.id);
-    try {
-      const prompt = [
-        `Split this task into exactly three concise micro‑tasks.`,
-        `Do NOT include the original task text.`,
-        `Respond with the three subtasks separated by commas, with no numbering or JSON.`,
-        `Task: "${task.content}"`
-      ].join('\n');
-
-      const { text } = await api.generateAI(prompt);
-      let cleaned = text.replace(/```.*?```/g, '').trim();
-      const subs = cleaned.includes(',')
-        ? cleaned.split(',').map(s => s.trim()).filter(s => s)
-        : cleaned.split(/\r?\n/).map(l => l.trim()).filter(l => l);
-
-      const filtered = subs.filter(s => s !== task.content.trim());
-      const newTasks: Task[] = filtered.slice(0, 3).map((content, i) => ({
-        id: `${task.id}-sub-${Date.now()}-${i}`,
-        content,
-      }));
-
-      setColumns(prev => {
-        const col   = prev[colId];
-        const index = col.tasks.findIndex(t => t.id === task.id);
-        if (index < 0) return prev;
-        const updated = [
-          ...col.tasks.slice(0, index + 1),
-          ...newTasks,
-          ...col.tasks.slice(index + 1),
-        ];
-        return { ...prev, [colId]: { ...col, tasks: updated } };
-      });
-    } finally {
-      setDecomposing(null);
-    }
-  };
-  // ────────────────────────────────────────────────────────────────────────
-
   return (
-    <div className="bg-[#f9f9f7] min-h-screen p-4 flex justify-center items-start">
+    <div className="bg-[#181414] min-h-screen p-4 flex justify-center items-start">
       <div className="w-full max-w-7xl">
         {/* Add new task */}
         <div className="flex gap-2 max-w-xl mx-auto mb-4">
           <input
-            className="flex-1 border px-4 py-2 rounded"
+            className="flex-1 border border-gray-700 bg-[#242424] text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
             placeholder="New task..."
             value={newTask}
             onChange={e => setNewTask(e.target.value)}
           />
           <select
-            className="border px-3 py-2 rounded"
+            className="border border-gray-700 bg-[#242424] text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
             value={targetColumn}
             onChange={e => setTargetColumn(e.target.value as ColumnId)}
           >
@@ -267,7 +181,7 @@ const InteractiveTodo: React.FC = () => {
           </select>
           <button
             onClick={handleAddTask}
-            className="bg-[#1B3B29] text-white px-6 py-2 rounded"
+            className="bg-[#1B3B29] hover:bg-[#152b1f] text-white px-6 py-2 rounded"
           >
             Add
           </button>
@@ -275,21 +189,21 @@ const InteractiveTodo: React.FC = () => {
 
         {/* Board */}
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-4 px-4 overflow-auto">
+          <div className="flex gap-4 px-4 overflow-auto pb-4">
             {Object.entries(columns).map(([colId, col]) => (
               <Droppable droppableId={colId} key={colId}>
                 {provided => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="bg-white border rounded p-4 w-64 flex-shrink-0"
+                    className="bg-[#242424] border border-gray-700 rounded p-4 w-64 flex-shrink-0"
                   >
                     <div className="flex justify-between items-center mb-3">
-                      <h3 className="font-bold">{col.title}</h3>
+                      <h3 className="font-bold text-white">{col.title}</h3>
                       <button
-                        onClick={() => handleAISort(colId as AllColumnId)}
+                        onClick={() => handleAISuggestPriority()}
                         disabled={sortingCol === colId}
-                        className="text-sm text-purple-600 hover:underline"
+                        className="text-purple-400 hover:underline text-sm"
                       >
                         {sortingCol === colId ? 'Sorting…' : 'AI Sort'}
                       </button>
@@ -306,29 +220,29 @@ const InteractiveTodo: React.FC = () => {
                               {...prov.dragHandleProps}
                               onClick={() => openEditModal(t, colId as AllColumnId)}
                               className={`
-                                p-3 mb-2 bg-gray-100 rounded flex flex-col justify-between
-                                ${isSub ? 'pl-4 border-l-2 border-gray-300' : ''}
-                                cursor-pointer
+                                p-3 mb-2 bg-[#333333] rounded flex flex-col justify-between
+                                ${isSub ? 'pl-4 border-l-2 border-gray-600' : ''}
+                                cursor-pointer hover:bg-[#3a3a3a]
                               `}
                             >
-                              <span className="break-words mb-2">{t.content}</span>
-                              <div className="flex flex-wrap gap-1 justify-end">
+                              <span className="text-white break-words mb-2">{t.content}</span>
+                              <div className="flex flex-wrap gap-2 justify-end">
                                 <button
                                   onClick={e => { e.stopPropagation(); handleDecompose(colId as AllColumnId, t); }}
                                   disabled={decomposing === t.id}
-                                  className="text-blue-500 px-2 py-1 border rounded"
+                                  className="text-blue-400 px-2 py-1 border border-gray-600 rounded hover:bg-[#2f2f2f]"
                                 >
                                   {decomposing === t.id ? '…' : 'Decompose'}
                                 </button>
                                 <button
                                   onClick={e => { e.stopPropagation(); handleComplete(colId as AllColumnId, t); }}
-                                  className="text-green-500 font-bold px-2 py-1 border rounded"
+                                  className="text-green-400 font-bold px-2 py-1 border border-gray-600 rounded hover:bg-[#2f2f2f]"
                                 >
                                   ✔
                                 </button>
                                 <button
                                   onClick={e => { e.stopPropagation(); handleDelete(colId as AllColumnId, t.id); }}
-                                  className="text-red-500 px-2 py-1 border rounded"
+                                  className="text-red-400 px-2 py-1 border border-gray-600 rounded hover:bg-[#2f2f2f]"
                                 >
                                   ✕
                                 </button>
@@ -348,17 +262,17 @@ const InteractiveTodo: React.FC = () => {
 
         {/* Edit Modal */}
         {modalTask && (
-          <div className="fixed inset-0 backdrop-filter backdrop-blur-lg flex items-center justify-center z-10">
-            <div className="bg-white p-6 rounded-lg w-80 shadow-lg">
-              <h4 className="mb-3 font-semibold">Edit Task</h4>
+          <div className="fixed inset-0 bg-transparent backdrop-blur-md flex items-center justify-center z-50">
+            <div className="bg-[#242424] p-6 rounded-lg w-80 shadow-lg border border-gray-700 text-white">
+              <h4 className="mb-3 text-lg font-semibold">Edit Task</h4>
               <input
-                className="w-full border p-2 rounded mb-3"
+                className="w-full bg-[#333333] border border-gray-600 text-white p-2 rounded mb-3 focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
                 value={modalName}
                 onChange={e => setModalName(e.target.value)}
               />
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-4">
                 <select
-                  className="border p-2 rounded flex-1"
+                  className="flex-1 bg-[#333333] border border-gray-600 text-white p-2 rounded focus:outline-none focus:ring-2 focus:ring-[#1B3B29]"
                   value={modalPriority}
                   onChange={e => setModalPriority(e.target.value as ColumnId)}
                 >
@@ -369,26 +283,27 @@ const InteractiveTodo: React.FC = () => {
                 <button
                   onClick={handleAISuggestPriority}
                   disabled={suggesting}
-                  className="ml-2 text-sm text-purple-600 hover:underline"
+                  className="ml-2 text-purple-400 text-sm hover:underline"
                 >
                   {suggesting ? 'Suggesting…' : 'AI Suggest'}
                 </button>
               </div>
               <button
                 onClick={handleSave}
-                className="w-full bg-[#1B3B29] text-white py-2 rounded mb-2"
+                className="w-full bg-[#1B3B29] hover:bg-[#152b1f] text-white py-2 rounded mb-2"
               >
                 Save
               </button>
               <button
                 onClick={closeModal}
-                className="w-full border py-2 rounded"
+                className="w-full border border-gray-700 text-gray-300 py-2 rounded hover:bg-[#2a2a2a]"
               >
                 Cancel
               </button>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
