@@ -10,7 +10,7 @@ const BrowserPage = ({
   sidebarCollapsed = false 
 }: BrowserPageProps) => {
   return (
-    <div className="h-screen flex flex-col bg-white">
+    <div className="h-screen flex flex-col bg-[#F7F5EF]">
       <div className="flex-1">
         <ChromeBrowser
           initialUrl="https://www.google.com"
