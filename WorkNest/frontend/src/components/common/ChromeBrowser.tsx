@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { PlusIcon, XMarkIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, HomeIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 
 // Declare the electronAPI interface
 declare global {
   interface Window {
     electronAPI?: {
-      createBrowserView: (url?: string, sidebarWidth?: number) => void;
+      createBrowserView: (url?: string, sidebarWidth?: number, preferredColorScheme?: string) => void;
       removeBrowserView: () => void;
       browserGoBack: () => void;
       browserGoForward: () => void;
@@ -14,9 +14,11 @@ declare global {
       getCurrentUrl: () => void;
       getNavigationState: () => void;
       updateBrowserViewBounds: (sidebarWidth: number) => void;
+      setColorScheme: (scheme: string) => void;
       onBrowserViewCreated: (callback: (id: number) => void) => void;
       onCurrentUrl: (callback: (url: string) => void) => void;
       onNavigationState: (callback: (state: NavigationState) => void) => void;
+      onPageTitleUpdated: (callback: (title: string) => void) => void;
       removeAllListeners: () => void;
     };
   }
@@ -62,6 +64,9 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
   
   // Track if there are no tabs open
   const [noTabs, setNoTabs] = useState(false);
+  
+  // Add state for color scheme preference
+  const [isDarkMode, setIsDarkMode] = useState(false);
   
   const actualSidebarWidth = sidebarCollapsed ? 0 : sidebarWidth;
   
@@ -129,9 +134,25 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
       );
       setInputUrl(state.currentUrl);
     });
+    
+    // Handle page title updates
+    window.electronAPI?.onPageTitleUpdated((title) => {
+      // Update the title for the active tab
+      setTabs(prevTabs => 
+        prevTabs.map(tab => 
+          tab.id === activeTabId 
+            ? { ...tab, title: title || getTabTitle(tab.url) } 
+            : tab
+        )
+      );
+    });
 
-    // Create the browser view with sidebar width information
-    window.electronAPI?.createBrowserView(activeTab.url, actualSidebarWidth);
+    // Create the browser view with sidebar width information and color scheme
+    window.electronAPI?.createBrowserView(
+      activeTab.url, 
+      actualSidebarWidth, 
+      isDarkMode ? 'dark' : 'light'
+    );
 
     // Poll navigation state periodically
     const intervalId = setInterval(() => {
@@ -146,7 +167,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
         window.electronAPI?.removeBrowserView();
       }
     };
-  }, [activeTabId, actualSidebarWidth, isElectron, noTabs]);
+  }, [activeTabId, actualSidebarWidth, isElectron, noTabs, isDarkMode]);
 
   // Update browser view bounds when sidebar width changes - only in Electron
   useEffect(() => {
@@ -194,6 +215,29 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
   const reload = () => {
     if (isElectron && !fallbackMode && !noTabs) {
       window.electronAPI?.browserReload();
+    }
+  };
+
+  // Toggle color scheme function
+  const toggleColorScheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    
+    if (isElectron && !fallbackMode && !noTabs) {
+      window.electronAPI?.setColorScheme(newMode ? 'dark' : 'light');
+    }
+    
+    // If using fallback mode with iframes, we can attempt to reload the iframe
+    // But this might not work with all websites due to browser security restrictions
+    if (fallbackMode && !noTabs) {
+      // Try to reload the active tab to apply new color scheme
+      setTabs(prevTabs => 
+        prevTabs.map(tab => 
+          tab.id === activeTabId 
+            ? { ...tab, url: tab.url } 
+            : tab
+        )
+      );
     }
   };
 
@@ -264,9 +308,9 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-white">
+    <div className="w-full h-full flex flex-col bg-[#F7F5EF]">
       {/* Tabs bar */}
-      <div className="flex items-center bg-white border-b">
+      <div className="flex items-center bg-[#F7F5EF] border-b">
         <div className="flex-1 flex overflow-x-auto">
           {tabs.map(tab => (
             <div
@@ -274,12 +318,12 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
               onClick={() => switchTab(tab.id)}
               className={`flex items-center min-w-[140px] max-w-[240px] px-3 py-2 border-r cursor-pointer ${
                 tab.id === activeTabId 
-                  ? 'bg-white text-gray-900 font-medium' 
-                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                  ? 'bg-[#F7F5EF] text-gray-900 font-medium' 
+                  : 'bg-[#F7F5EF] text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <div className="truncate flex-1">
-                {getTabTitle(tab.url)}
+              <div className="truncate flex-1 text-black">
+                {tab.title || getTabTitle(tab.url)}
               </div>
               <button
                 onClick={(e) => closeTab(tab.id, e)}
@@ -323,6 +367,21 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
         >
           ↻
         </button>
+        
+        {/* Color scheme toggle button */}
+        <button
+          onClick={toggleColorScheme}
+          disabled={fallbackMode || noTabs}
+          className={`p-2 rounded ${(!fallbackMode && !noTabs) ? 'text-gray-700 hover:bg-gray-200' : 'text-gray-400'}`}
+          aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {isDarkMode ? (
+            <SunIcon className="h-5 w-5" />
+          ) : (
+            <MoonIcon className="h-5 w-5" />
+          )}
+        </button>
+        
         <form onSubmit={handleUrlSubmit} className="flex-1 ml-2">
           <input
             type="text"
@@ -334,7 +393,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
                 e.stopPropagation();
               }
             }}
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-500 text-black"
             placeholder="Enter URL..."
             disabled={noTabs}
           />
@@ -346,7 +405,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
       
       {/* Content area */}
       {noTabs ? (
-        <div className="flex-1 bg-white flex flex-col items-center justify-center">
+        <div className="flex-1 bg-[#F7F5EF] flex flex-col items-center justify-center">
           <div className="text-center max-w-md p-6 bg-gray-50 rounded-lg shadow-sm">
             <HomeIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-medium text-gray-800 mb-2">No Open Tabs</h2>
@@ -361,7 +420,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
           </div>
         </div>
       ) : fallbackMode ? (
-        <div className="flex-1 bg-white">
+        <div className="flex-1 bg-[#F7F5EF]">
           {tabs.map(tab => (
             <iframe 
               key={tab.id}
@@ -377,7 +436,7 @@ const ChromeBrowser: React.FC<ChromeBrowserProps> = ({
         </div>
       ) : (
         /* The actual browser content is rendered by Electron in the main process */
-        <div className="flex-1 bg-white" style={{ height: 'calc(100vh - 130px)' }}></div>
+        <div className="flex-1 bg-[#F7F5EF]" style={{ height: 'calc(100vh - 130px)' }}></div>
       )}
       
       {fallbackMode && !noTabs && (

@@ -1,12 +1,14 @@
+// main.js
 const { app, BrowserWindow, BrowserView, ipcMain } = require('electron');
 const path = require('path');
 
 let mainWindow;
 let browserView;
 let currentUrl = 'https://www.google.com';
+let currentColorScheme = 'light';
+let currentSidebarWidth = 0;
 
 function createWindow() {
-  // Create the main application window
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -17,21 +19,96 @@ function createWindow() {
     },
   });
 
-  // This tells Electron where your frontend is during development
+  // Prevent “MaxListenersExceededWarning”
+  mainWindow.setMaxListeners(20);
+
+  // Always adjust BrowserView on resize
+  mainWindow.on('resize', () => {
+    if (browserView) {
+      const { width, height } = mainWindow.getBounds();
+      browserView.setBounds({
+        x: currentSidebarWidth,
+        y: 100,
+        width: width - currentSidebarWidth,
+        height: height - 100,
+      });
+    }
+  });
+
   mainWindow.loadURL('http://localhost:5173');
-  
-  // Uncomment this to open DevTools automatically
-  // mainWindow.webContents.openDevTools();
 }
 
-// Create browser view when requested by the renderer
-ipcMain.on('create-browser-view', (event, url, sidebarWidth = 0) => {
-  // Save current URL if provided
-  if (url) {
-    currentUrl = url;
-  }
+function applyLightMode() {
+  if (!browserView) return;
+  browserView.webContents.executeJavaScript(`
+    try {
+      document.documentElement.style.colorScheme = 'light';
+      let style = document.querySelector('style[data-force-color-scheme]');
+      if (!style) {
+        style = document.createElement('style');
+        style.setAttribute('data-force-color-scheme', 'true');
+        document.head.appendChild(style);
+      }
+      style.textContent = \`
+        html, body {
+          color-scheme: light !important;
+          background: #F7F5EF !important;
+          color: #000 !important;
+        }
+        * {
+          color: #000 !important;
+          background: #F7F5EF !important;
+        }
+      \`;
+      let meta = document.querySelector('meta[name="color-scheme"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'color-scheme';
+        document.head.appendChild(meta);
+      }
+      meta.content = 'light';
+    } catch (e) {
+      console.error(e);
+    }
+  `).catch(console.error);
+}
 
-  // Create browser view if it doesn't exist yet
+function applyDarkMode() {
+  if (!browserView) return;
+  browserView.webContents.executeJavaScript(`
+    try {
+      document.documentElement.style.colorScheme = 'dark';
+      let style = document.querySelector('style[data-force-color-scheme]');
+      if (!style) {
+        style = document.createElement('style');
+        style.setAttribute('data-force-color-scheme', 'true');
+        document.head.appendChild(style);
+      }
+      style.textContent = \`
+        html, body {
+          color-scheme: dark !important;
+          background: #121212 !important;
+          color: #fff !important;
+        }
+      \`;
+      let meta = document.querySelector('meta[name="color-scheme"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'color-scheme';
+        document.head.appendChild(meta);
+      }
+      meta.content = 'dark';
+    } catch (e) {
+      console.error(e);
+    }
+  `).catch(console.error);
+}
+
+ipcMain.on('create-browser-view', (event, url, sidebarWidth = 0, colorScheme = 'light') => {
+  currentUrl = url || currentUrl;
+  currentColorScheme = colorScheme;
+  currentSidebarWidth = sidebarWidth;
+
   if (!browserView) {
     browserView = new BrowserView({
       webPreferences: {
@@ -40,114 +117,116 @@ ipcMain.on('create-browser-view', (event, url, sidebarWidth = 0) => {
         contextIsolation: true,
       }
     });
-    
     mainWindow.setBrowserView(browserView);
   }
-  
-  // Set the bounds to fill most of the window, accounting for sidebar
-  const bounds = mainWindow.getBounds();
-  browserView.setBounds({ 
-    x: sidebarWidth, 
-    y: 100, // Leave more space for tab bar and controls at top
-    width: bounds.width - sidebarWidth, 
-    height: bounds.height - 100 
+
+  const { width, height } = mainWindow.getBounds();
+  browserView.setBounds({
+    x: currentSidebarWidth,
+    y: 100,
+    width: width - currentSidebarWidth,
+    height: height - 100,
   });
-  
-  // Navigate to the URL
+
   browserView.webContents.loadURL(currentUrl);
-  
-  // Send back the browserView ID to the renderer
   event.reply('browser-view-created', browserView.id);
-  
-  // Handle window resize to adjust the browser view
-  mainWindow.on('resize', () => {
-    if (browserView) {
-      const bounds = mainWindow.getBounds();
-      const currentBounds = browserView.getBounds();
-      browserView.setBounds({ 
-        x: currentBounds.x, // Keep the current X position (for sidebar)
-        y: 100, // Keep space for tabs and controls
-        width: bounds.width - currentBounds.x, 
-        height: bounds.height - 100 
-      });
-    }
-  });
-  
-  // Listen for page title updates
-  browserView.webContents.on('page-title-updated', (event, title) => {
-    // Send the title back to the renderer
-    if (mainWindow && !mainWindow.isDestroyed()) {
+
+  browserView.webContents.on('page-title-updated', (e, title) => {
+    if (!mainWindow.isDestroyed()) {
       mainWindow.webContents.send('page-title-updated', title);
     }
   });
+
+  browserView.webContents.on('did-finish-load', () => {
+    currentColorScheme === 'light' ? applyLightMode() : applyDarkMode();
+  });
+  browserView.webContents.on('dom-ready', () => {
+    currentColorScheme === 'light' ? applyLightMode() : applyDarkMode();
+  });
 });
 
-// Update browser view bounds when the sidebar is toggled
-ipcMain.on('update-browser-view-bounds', (event, sidebarWidth = 0) => {
-  if (browserView) {
-    const bounds = mainWindow.getBounds();
-    browserView.setBounds({ 
-      x: sidebarWidth, 
-      y: 100, // Keep space for tabs and controls
-      width: bounds.width - sidebarWidth, 
-      height: bounds.height - 100 
-    });
-  }
-});
-
-// Handle navigation controls
 ipcMain.on('browser-go-back', () => {
-  if (browserView && browserView.webContents.canGoBack()) {
+  if (browserView && browserView.webContents.navigationHistory.canGoBack()) {
     browserView.webContents.goBack();
   }
 });
 
 ipcMain.on('browser-go-forward', () => {
-  if (browserView && browserView.webContents.canGoForward()) {
+  if (browserView && browserView.webContents.navigationHistory.canGoForward()) {
     browserView.webContents.goForward();
   }
 });
 
 ipcMain.on('browser-reload', () => {
-  if (browserView) {
-    browserView.webContents.reload();
-  }
+  if (browserView) browserView.webContents.reload();
 });
 
-ipcMain.on('browser-navigate', (event, url) => {
+ipcMain.on('browser-navigate', (_, url) => {
   if (browserView) {
-    currentUrl = url; // Save the current URL
+    currentUrl = url;
     browserView.webContents.loadURL(url);
   }
 });
 
 ipcMain.on('get-current-url', (event) => {
-  if (browserView) {
-    event.reply('current-url', browserView.webContents.getURL());
-  } else {
-    event.reply('current-url', currentUrl);
-  }
+  const replyUrl = browserView ? browserView.webContents.getURL() : currentUrl;
+  event.reply('current-url', replyUrl);
 });
 
 ipcMain.on('get-navigation-state', (event) => {
   if (browserView) {
+    const nav = browserView.webContents.navigationHistory;
     event.reply('navigation-state', {
-      canGoBack: browserView.webContents.canGoBack(),
-      canGoForward: browserView.webContents.canGoForward(),
+      canGoBack: nav.canGoBack(),
+      canGoForward: nav.canGoForward(),
       isLoading: browserView.webContents.isLoading(),
-      currentUrl: browserView.webContents.getURL()
+      currentUrl: browserView.webContents.getURL(),
     });
   } else {
     event.reply('navigation-state', {
       canGoBack: false,
       canGoForward: false,
       isLoading: false,
-      currentUrl: currentUrl
+      currentUrl,
     });
   }
 });
 
-// Remove browser view when requested
+ipcMain.on('update-browser-view-bounds', (_, sidebarWidth = 0) => {
+  currentSidebarWidth = sidebarWidth;
+  if (browserView) {
+    const { width, height } = mainWindow.getBounds();
+    browserView.setBounds({
+      x: currentSidebarWidth,
+      y: 100,
+      width: width - currentSidebarWidth,
+      height: height - 100,
+    });
+  }
+});
+
+ipcMain.on('set-color-scheme', (_, scheme = 'light') => {
+  currentColorScheme = scheme;
+  if (!browserView) return;
+
+  scheme === 'light' ? applyLightMode() : applyDarkMode();
+
+  // reload heavy sites if still alive
+  setTimeout(() => {
+    try {
+      const wc = browserView.webContents;
+      if (!wc.isDestroyed()) {
+        const url = wc.getURL();
+        if (/(google\.com|youtube\.com|github\.com)/.test(url)) {
+          wc.reload();
+        }
+      }
+    } catch (err) {
+      console.error('Error reloading after color‑scheme change:', err);
+    }
+  }, 500);
+});
+
 ipcMain.on('remove-browser-view', () => {
   if (browserView) {
     mainWindow.removeBrowserView(browserView);
@@ -157,12 +236,11 @@ ipcMain.on('remove-browser-view', () => {
 
 app.whenReady().then(() => {
   createWindow();
-
-  app.on('activate', function () {
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
-app.on('window-all-closed', function () {
+app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
